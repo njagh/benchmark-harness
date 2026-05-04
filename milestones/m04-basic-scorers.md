@@ -189,6 +189,8 @@ scoring:
 
 ### 4.5 Implement JSON schema scorer
 
+Use the `jsonschema` library (already in pyproject.toml) rather than hand-rolling JSON validation. The `jsonschema.validate()` and `jsonschema.Draft202012Validator` classes provide standard-compliant validation with detailed error messages.
+
 **File:** `src/bench_harness/scorers/json_schema.py`
 
 **Class:** `JsonSchemaScorer(BaseScorer)`
@@ -482,6 +484,19 @@ scorers:
 - [ ] Implement all tests with pytest
 - [ ] Use parametrized tests for multiple input variants
 - [ ] Ensure tests are deterministic (no network, no randomness)
+
+### 4.13 Note on IFEval integration
+
+Google's IFEval benchmark (https://github.com/google-research/google-research/tree/master/instruction_following_eval) provides a standardized instruction-following test suite. Rather than reimplementing IFEval's prompt templates and scoring logic, the harness should:
+
+1. Download IFEval data once to `~/datasets/evals/ifeval_v1/`
+2. Run IFEval as a suite using the harness's runner infrastructure
+3. Store IFEval results in the harness SQLite database alongside local tasks
+4. Use IFEval's own prompt format but score through the harness's scorers
+
+This avoids duplicating IFEval's task definitions while keeping results in a unified database.
+
+**Deferred to:** Milestone 6 (public benchmark integration)
 
 ---
 

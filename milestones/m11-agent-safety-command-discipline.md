@@ -18,6 +18,13 @@ Phase C — Deep model/backend comparison (Milestone 3 of 4 in phase)
 
 ---
 
+### Leveraged Libraries
+
+- **shellingham** (`shellingham`): Detects the user's shell (bash, zsh, fish, etc.) for shell command parsing context. Lightweight, no heavy deps.
+- Standard library `shlex`: Use for shell tokenization (`shlex.split()`, `shlex.join()`) to properly handle quoted arguments, pipes, and redirects when parsing commands from model responses.
+
+---
+
 ## Subtasks
 
 ### 11.1 Define risky command categories and allowlist

@@ -76,13 +76,20 @@ benchmark-harness/
 **File:** `pyproject.toml`
 
 **Required dependencies:**
+- `typer[all]` — CLI framework (with async and rich support)
+- `rich` — CLI output formatting, tables, progress bars
 - `pyyaml` — YAML config parsing
+- `pydantic` — task schema validation (used from M1 onward for configs)
 - `openai` — OpenAI-compatible client
-- `sqlite-utils` (optional) — SQLite helpers, or use stdlib `sqlite3`
-- `rich` — CLI output formatting
-- `typer` — CLI framework
 - `httpx` — async HTTP (used by openai client)
-- `pytest` — testing
+- `sqlite-utils` — SQLite helpers (bulk insert, schema management, CSV export). Use THIS over raw sqlite3.
+- `jsonschema` — JSON schema validation (used by M4 scorer, but install early)
+- `jinja2` — prompt template rendering (used by M2, but install early)
+- `unidiff` — unified diff parsing (used by M5, but install early)
+- `pytest` — testing framework
+- `pytest-asyncio` — async test support
+
+All libraries are installed at project bootstrap to avoid piecemeal dependency management. Libraries not yet used by M1 will have their import guarded by lazy loading.
 
 **File structure:**
 - `[project]` with name `bench-harness`, version `0.1.0`
@@ -493,6 +500,51 @@ python -m bench_harness run \
 - [ ] Implement tests with pytest
 - [ ] Use fixture for temp SQLite DB path
 - [ ] Ensure tests pass with `pytest tests/`
+
+### 1.16 Define dataset registry config
+
+**File:** `configs/datasets.yaml`
+
+**Content spec:**
+```yaml
+# Dataset registry — all benchmark data is loaded from local pinned files.
+# Never stream from HuggingFace during measured runs.
+# See STORAGE_PLAN.md for dataset layout and access patterns.
+
+datasets:
+  # Local task packs live in the repo under tasks/
+  smoke_v1:
+    type: local_yaml
+    path: "tasks/smoke"
+    description: "Five smoke tasks for harness verification"
+
+  coding_smoke_v1:
+    type: local_yaml
+    path: "tasks/coding_smoke"
+    description: "Coding regression smoke tasks"
+
+  # External eval data lives in ~/datasets/evals/
+  # These are populated by scripts/prepare_eval_dataset.py (M2+)
+  # mmlu_pro_v1:
+  #   type: jsonl
+  #   path: "/home/njalbicelli/datasets/evals/mmlu_pro_v1/tasks.jsonl"
+  #   manifest: "/home/njalbicelli/datasets/evals/mmlu_pro_v1/MANIFEST.json"
+```
+
+**File:** `src/bench_harness/config.py` — add function:
+- `load_dataset_config(path: str) -> dict` — loads configs/datasets.yaml
+- `get_dataset(config: dict, name: str) -> dict | None`
+
+**STORAGE_PLAN integration notes:**
+- Harness never pulls live from HuggingFace during benchmark runs
+- All eval data is downloaded once, pinned with manifest, stored locally
+- `HF_HOME`, `HF_DATASETS_CACHE`, `HF_HUB_CACHE` env vars documented in `.env.example`
+- Dataset paths use `~/datasets/evals/` for external data, `tasks/` for local YAML tasks
+
+**Actions:**
+- [ ] Create configs/datasets.yaml
+- [ ] Add dataset config loader to config.py
+- [ ] Add HF cache env var docs to .env.example
 
 ---
 

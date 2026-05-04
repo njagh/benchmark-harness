@@ -18,6 +18,18 @@ Phase D — Data flywheel (Milestone 3 of 4 in phase)
 
 ---
 
+### CI Data Access
+
+GitHub Actions runners do not have GPU access or local model endpoints. The CI workflow (15.7) is limited to:
+- Task schema validation (pytest)
+- Config file validation
+- Code linting and type checking
+- Mock runner dry-run tests
+
+Full regression comparison against a model endpoint requires the DGX Spark runner or manual workflow dispatch with GPU access. The `.github/workflows/full-regression.yml` uses `self-hosted, GPU` runner label and is triggered manually via `workflow_dispatch`.
+
+---
+
 ## Subtasks
 
 ### 15.1 Create quick_regression suite

@@ -33,6 +33,8 @@ Phase D — Data flywheel (Milestone 2 of 4 in phase)
 - `seaborn` — statistical visualizations
 - `plotly` (optional) — interactive charts
 
+Note: DuckDB is the primary analysis engine. It attaches to the SQLite benchmark database directly, allowing complex SQL queries without ETL. All notebook queries should use DuckDB, not pandas read_sqlite, for performance on larger run databases.
+
 **Notebook structure (cells):**
 
 ```

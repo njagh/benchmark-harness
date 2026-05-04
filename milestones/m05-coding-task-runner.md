@@ -15,6 +15,14 @@ Phase B — Real coding usefulness (Milestone 3 of 4 in phase)
 - Milestone 3 (timing metrics)
 - Milestone 4 (basic scorers — regex scorer used for code extraction)
 
+### Leveraged Libraries
+
+This milestone leverages existing libraries rather than building execution infrastructure from scratch:
+
+- **bigcode-tools** (`bigcode-evaluation-hub`): Provides HumanEval/MBPP evaluation infrastructure including function extraction, isolated execution, timeout handling, and pass@k computation. Use for function-completion tasks.
+- **unidiff**: Parses unified diffs into structured objects (chunks, lines, file paths). Use for patch extraction and minimality scoring.
+- **eval_plus** (`evalplus`): Deobfuscated HumanEval+/MBPP+ with stronger test suites. Use as the test source for coding tasks rather than the original HumanEval tests.
+
 ---
 
 ## Subtasks
@@ -96,6 +104,7 @@ risk_level: low
 - [ ] Extend Task schema with code-specific fields
 - [ ] Add `category` field values: `function_completion`, `patch_generation`, `file_creation`
 - [ ] Update loader to handle code task fields
+- [ ] Add `bigcode-tools` and `evalplus` to pyproject.toml as optional dependencies (they have heavier deps; keep as `[project.optional-dependencies]`)
 
 ### 5.2 Implement code runner base class
 
@@ -189,6 +198,8 @@ def best_effort_code_extract(response: str) -> tuple[str, str]:
     """
 ```
 
+bigcode-tools provides `extract_code()` utilities for HumanEval-style extraction. Adapt these rather than writing from scratch. The harness's `code_extractor.py` should wrap or extend bigcode-tools extraction with additional support for patch-only and multi-file responses.
+
 **Actions:**
 - [ ] Implement code fence extraction with language filter
 - [ ] Implement Python function extraction with regex
@@ -211,6 +222,8 @@ def best_effort_code_extract(response: str) -> tuple[str, str]:
 6. Capture stdout, stderr, exit code
 7. Parse pytest output for pass/fail counts
 8. Return `CodeRunResult`
+
+bigcode-tools provides `execute_sample()` which handles isolated temp directory creation, test file copying, subprocess execution with timeout, and output parsing. Use as the base execution layer. The harness wraps it to capture additional metrics (TTFT, GPU memory) and to integrate with the scorer pipeline.
 
 **Test execution details:**
 ```python
@@ -252,6 +265,8 @@ result = subprocess.run(
 6. Check for unrelated file changes:
    - Compare files in work directory before/after patch
    - Flag any modified files not in `allowed_file_changes`
+
+Use `unidiff` library to parse unified diffs from model responses. `unidiff.parse_patch()` returns structured Chunk objects with added/removed/lines. Combine with `filecmp` (stdlib) for unrelated-change detection.
 
 **Patch application:**
 ```python

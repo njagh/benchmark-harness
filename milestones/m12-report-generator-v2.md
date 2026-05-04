@@ -21,6 +21,14 @@ Phase C / Phase D bridge — Makes all prior milestones actionable
 
 ---
 
+### Leveraged Libraries
+
+- **DuckDB** (`duckdb`): Query SQLite benchmark database with SQL for report data aggregation. DuckDB can attach SQLite databases directly and run complex aggregation queries without ETL. Use for all report data queries.
+- **matplotlib + seaborn** (`matplotlib`, `seaborn`): Chart generation for speed/quality frontier, failure clustering heatmaps, etc. Save as PNG for Markdown embedding and SVG for HTML.
+- **great-tables** (`great-tables`): Generate polished Markdown and HTML tables from pandas DataFrames. Superior to pandas default table rendering for reports.
+
+---
+
 ## Subtasks
 
 ### 12.1 Redesign report data layer
@@ -35,7 +43,8 @@ class ReportDataLayer:
     """Queries SQLite and assembles structured data for all report sections."""
 
     def __init__(self, db_path: str):
-        self.db = sqlite3.connect(db_path)
+        self.con = duckdb.connect()
+        self.con.execute(f"ATTACH '{db_path}' AS benchmark (TYPE SQLITE)")
 
     def get_run_summary(self) -> RunSummary:
         """Aggregate summary: suites run, models compared, total tasks."""

@@ -4,9 +4,31 @@ Evaluates response quality, coding ability, instruction following, and performan
 
 ## Current Status
 
-**Phase:** Planning complete. Implementation not yet started.
+**Phase:** Planning complete. Dependencies installed. Implementation beginning.
 
-The `ROADMAP.md` defines 15 milestones across 4 phases. Detailed execution plans for all milestones have been generated under `milestones/`.
+The `ROADMAP.md` defines 15 milestones across 4 phases. Detailed execution plans with library integration notes are in `milestones/`. Virtual environment and core dependencies are set up.
+
+## Quick Start
+
+```bash
+source .venv/bin/activate
+python -m bench_harness --help
+```
+
+For analysis/dashboard work:
+```bash
+pip install -e ".[analysis]"
+```
+
+For coding benchmark integration (bigcode-tools, evalplus):
+```bash
+pip install -e ".[coding]"
+```
+
+For long-context benchmarks (GPU monitoring, tokenizers):
+```bash
+pip install -e ".[long-context]"
+```
 
 ## Milestones
 
@@ -44,7 +66,40 @@ python -m bench_harness run \
   --runs 3
 ```
 
+## Leveraged Libraries
+
+| Library | Used By | Purpose |
+|---|---|---|
+| `openai` | M1 | OpenAI-compatible client for local endpoints |
+| `sqlite-utils` | M1 | SQLite storage, bulk insert, CSV export |
+| `typer` / `rich` | M1 | CLI framework and terminal output |
+| `pydantic` | M1 | Config and task schema validation |
+| `jsonschema` | M4 | JSON schema validation scorer |
+| `jinja2` | M2 | Prompt template rendering |
+| `unidiff` | M5 | Unified diff parsing for patches |
+| `bigcode-tools` | M5 (opt) | HumanEval/MBPP execution infrastructure |
+| `evalplus` | M5 (opt) | Deobfuscated coding test suites |
+| `lm-eval` | M6 (opt) | Public benchmark integration (MMLU, GPQA, BBH, etc.) |
+| `lm-evaluation-harness` | M6 (opt) | Standard eval harness |
+| `shellingham` / `shlex` | M11 | Shell command parsing |
+| `pynvml` | M9 (opt) | GPU memory/utilization monitoring |
+| `transformers` | M9 (opt) | Tokenizer for context packing |
+| `duckdb` | M12 (opt) | SQL queries on SQLite for reports |
+| `matplotlib` / `seaborn` | M12/M14 (opt) | Chart generation |
+| `great-tables` | M12 (opt) | Polished report tables |
+
+## Data Access
+
+Per `STORAGE_PLAN.md`:
+
+- External eval data lives in `~/datasets/evals/` — pinned local copies with manifests
+- HF cache at `~/datasets/cache/huggingface/` — set `HF_HOME` before any HF downloads
+- No live streaming from HuggingFace during measured runs
+- Dataset registry in `configs/datasets.yaml`
+
 ## Details
 
 - `ROADMAP.md` — Full project specification and design decisions
-- `milestones/` — Per-milestone execution plans with subtasks, file specs, and acceptance criteria
+- `STORAGE_PLAN.md` — Dataset layout, HF cache config, DGX Spark access patterns
+- `milestones/` — Per-milestone execution plans with subtasks, file specs, library integration notes, and acceptance criteria
+- `pyproject.toml` — Dependencies (core + optional groups)

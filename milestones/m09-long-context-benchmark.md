@@ -18,6 +18,34 @@ Phase C — Deep model/backend comparison (Milestone 1 of 4 in phase)
 
 ---
 
+### Leveraged Libraries and Data Access
+
+**Context packing:**
+- **transformers.AutoTokenizer**: Use HuggingFace transformers tokenizer for accurate token counting during context packing. Load tokenizer once, cache it. Do NOT load per-task.
+- The tokenizer for Qwen-family models should be loaded from the local HF cache (`~/datasets/cache/huggingface/`), not downloaded live.
+
+**Context cache (STORAGE_PLAN):**
+Per STORAGE_PLAN.md section 7B (Long-context benchmark):
+```
+~/datasets/evals/long_context_v1/
+  contexts/
+    qwen3_replicate_032k.txt
+    qwen3_replicate_064k.txt
+    qwen3_replicate_128k.txt
+  tasks.jsonl
+  manifest.json
+```
+- Context packing is deterministic and should be cached
+- Token counts should be known before the run
+- Do not rebuild 128k prompts every benchmark
+- Packed contexts are stored in `~/datasets/evals/long_context_v1/contexts/` and registered in `configs/datasets.yaml`
+
+**GPU monitoring:**
+- Use `pynvml` (NVIDIA Management Library) for GPU metrics instead of shell-out to `nvidia-smi`. It's faster, more reliable, and returns structured data.
+- Add `nvidia-ml-py` to pyproject.toml dependencies
+
+---
+
 ## Subtasks
 
 ### 9.1 Design long-context task schema
@@ -84,6 +112,10 @@ class ContextPacker:
 
     def __init__(self, filler_dirs: list[str], tokenizer_name: str = "Qwen/Qwen2.5-7B"):
         self.filler_dirs = filler_dirs
+        # Load tokenizer from HF local cache, not from the internet.
+        # Set HF_HOME=/home/njalbicelli/datasets/cache/huggingface before calling AutoTokenizer.from_pretrained().
+        import os
+        os.environ["HF_HOME"] = "/home/njalbicelli/datasets/cache/huggingface"
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
     def load_fillers(self, source: str) -> list[str]:
@@ -301,17 +333,34 @@ class LongContextMetrics:
 
 **File:** `src/bench_harness/metrics/gpu.py` (new)
 ```python
+import pynvml
+
 class GPUMonitor:
+    def __init__(self):
+        pynvml.nvmlInit()
+
     def snapshot(self) -> dict:
         """Return current GPU memory used, utilization, temperature."""
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+        temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
+        return {
+            "memory_used_mb": mem_info.used / 1024 / 1024,
+            "memory_free_mb": mem_info.free / 1024 / 1024,
+            "memory_total_mb": mem_info.total / 1024 / 1024,
+            "gpu_utilization_pct": util.gpu,
+            "temperature_c": temp,
+        }
 
     def monitor_during(self, callable_fn):
         """Context manager that tracks GPU metrics during execution."""
+        pass
 ```
 
 **Actions:**
 - [ ] Extend timing capture to separate prefill from decode
-- [ ] Implement `GPUMonitor` using `subprocess` calling `nvidia-smi` or `pynvml`
+- [ ] Implement `GPUMonitor` using `pynvml` (`nvmlInit()`, `nvmlDeviceGetMemoryInfo()`, etc.)
 - [ ] Add memory snapshot before, during, and after each API call
 - [ ] Extend `RunResult` to carry new metric fields
 

@@ -19,6 +19,13 @@ Phase D — Data flywheel (Milestone 1 of 4 in phase)
 
 ---
 
+### Leveraged Libraries
+
+- **jsonschema** (already in pyproject.toml): Validate judge JSON output against expected schema
+- No heavy external dependencies — judge scoring is harness-specific logic
+
+---
+
 ## Subtasks
 
 ### 7.1 Implement judge model configuration

@@ -16,6 +16,27 @@ Phase B — Real coding usefulness (Milestone 4 of 4 in phase)
 - Milestone 4 (basic scorers)
 - Milestone 5 (coding task runner with test execution)
 
+### Leveraged Libraries and Data Access
+
+**Public benchmark integration (lm-eval):**
+The roadmap (§6.2) references IFEval, MMLU-Pro, GPQA, BBH, MATH, HumanEval, and MBPP. Rather than hand-writing task YAMLs for these, the harness should integrate with **lm-evaluation-harness** (https://github.com/EleutherAI/lm-evaluation-harness) where practical:
+
+1. Run public benchmarks through `lm-eval` directly (it handles prompt templates, tokenization, and scoring)
+2. Store summarized metrics in the harness SQLite database
+3. Use the harness's unified report generator to present public + local results together
+4. This avoids duplicating thousands of benchmark tasks and their scoring logic
+
+**Dataset access (STORAGE_PLAN):**
+- All external benchmark data follows the STORAGE_PLAN.md layout: `~/datasets/evals/` for pinned local copies
+- Never stream from HuggingFace during measured runs
+- Each dataset has a manifest with source, revision, checksum, and sample metadata
+- The harness reads only from registered local datasets (configs/datasets.yaml)
+
+**eval_plus for coding tests:**
+- Use `evalplus` (https://github.com/evalplus/eval_plus) for HumanEval+ and MBPP+ test suites
+- These are deobfuscated versions with stronger tests than the originals
+- Download test files once to `~/datasets/evals/evalplus/` and reference locally
+
 ---
 
 ## Subtasks

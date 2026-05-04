@@ -18,6 +18,25 @@ Phase C — Deep model/backend comparison (Milestone 2 of 4 in phase)
 
 ---
 
+### Data Access (STORAGE_PLAN)
+
+Per STORAGE_PLAN.md: quantization comparison runs require pinned, reproducible datasets. Each quantized variant runs against the same local dataset copies:
+
+```
+~/datasets/evals/quant_comparison_v1/
+  tasks.jsonl
+  manifest.json
+```
+
+The manifest pins:
+- Dataset name, source, revision
+- Checksum of the local file
+- Task count and categories
+
+This ensures quantization quality deltas are measured against identical inputs, not varying remote data.
+
+---
+
 ## Subtasks
 
 ### 10.1 Add quantization metadata to model config

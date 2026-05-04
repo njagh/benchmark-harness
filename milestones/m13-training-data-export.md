@@ -18,6 +18,28 @@ Phase D — Data flywheel (Milestone 1 of 4 in phase)
 
 ---
 
+### Export Layout (STORAGE_PLAN)
+
+Exported training data follows STORAGE_PLAN.md layout:
+
+```
+~/datasets/training/
+  local_agent_sft_v1/
+    train.jsonl
+    validation.jsonl
+    manifest.json
+  local_agent_dpo_v1/
+    train.jsonl
+    validation.jsonl
+    manifest.json
+```
+
+- Exported files are sharded if larger than 100k examples
+- Each export writes a manifest with source run IDs, score thresholds, filter stats, and checksums
+- Hygiene filters (M13.6) run before writing to disk
+
+---
+
 ## Subtasks
 
 ### 13.1 Implement SFT JSONL export
