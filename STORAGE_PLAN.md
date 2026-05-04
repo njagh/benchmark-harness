@@ -1,91 +1,273 @@
-For the DGX Spark, I’d use **three different access patterns**, depending on whether you are doing quick evals, repeated benchmarks, or training.
+# STORAGE_PLAN — DGX Spark Benchmark / Dataset / Model Storage
 
-## Best default strategy
+## 1. Hardware Overview
 
-Use this hierarchy:
+### Internal NVMe (hot storage)
+
+```text
+/dev/nvme0n1p2  ~3.7T total, ~1.9T used, ~1.7T available
+  nvme0n1p1  EFI
+  nvme0n1p2  ext4 root mounted at /
+```
+
+**Use for:**
+
+- Active/default model weights (`agent-code`, `qwen-dense`, current default coding model)
+- Current benchmark harness repo and active runs
+- Docker images and active compose stacks
+- Latency-sensitive workloads (frequent model loading, always-on services)
+
+### External USB4 NVMe (bulk storage)
+
+```text
+/dev/sda  model: ASM246X  ~3.6T
+mounted at: /mnt/datasets-big/
+filesystem label: datasets-big
+```
+
+**Persistent mount entry** (`/etc/fstab`):
+
+```text
+LABEL=datasets-big /mnt/datasets-big ext4 defaults,nofail,x-systemd.device-timeout=10 0 2
+```
+
+The `nofail` option is intentional so the system can still boot if the external drive is disconnected.
+
+After editing `/etc/fstab`, reload systemd:
+
+```bash
+sudo systemctl daemon-reload
+sudo umount /mnt/datasets-big
+sudo mount -a
+df -h /mnt/datasets-big
+```
+
+**Verify mount before containers:**
+
+```bash
+df -h /mnt/datasets-big
+mount | grep datasets-big
+```
+
+---
+
+## 2. External Drive Layout
+
+```text
+/mnt/datasets-big/
+  hf-cache/               Hugging Face cache
+    huggingface/           HF_HOME (models, configs, tokenizers)
+    datasets/              HF_DATASETS_CACHE (downloaded/processed datasets)
+    hub/                   HF_HUB_CACHE (model snapshots, Hub artifacts)
+  raw/                    Raw downloaded source data (before cleaning/filtering)
+  evals/                  Pinned benchmark/evaluation datasets
+  training/               Prepared training datasets (SFT, DPO, LoRA, etc.)
+  tokenized/              Pre-tokenized/packed datasets for faster training
+  benchmark-runs-archive/ Older benchmark run outputs, logs, reports, artifacts
+  models-archive/         Inactive or experimental model checkpoints
+```
+
+---
+
+## 3. Directory Details & Access Policies
+
+### 3.1 HF Cache (`hf-cache/`)
+
+Stable host path for Hugging Face cache. Avoids Docker containers inventing root-owned caches.
+
+```bash
+export HF_HOME=/mnt/datasets-big/hf-cache/huggingface
+export HF_DATASETS_CACHE=/mnt/datasets-big/hf-cache/datasets
+export HF_HUB_CACHE=/mnt/datasets-big/hf-cache/hub
+```
+
+### 3.2 Raw (`raw/`)
+
+Raw downloaded source data before cleaning, filtering, or tokenization.
+
+Examples: raw HF dataset samples, public corpus slices, unprocessed JSONL/Parquet dumps.
+
+**Do not train directly from this directory** unless intentionally doing raw-data experiments.
+
+### 3.3 Eval Datasets (`evals/`)
+
+Pinned benchmark/evaluation datasets and task packs. Benchmarks must use **local pinned subsets**, never live streaming during measured runs.
+
+**Recommended pattern:**
+
+```text
+/mnt/datasets-big/evals/<dataset_id>/
+  tasks.jsonl
+  MANIFEST.json
+```
+
+**Dataset IDs:**
+
+```text
+smoke_v1, coding_smoke_v1, local_coding_v1, long_context_v1
+mmlu_pro_subset_v1, gpqa_subset_v1, ifeval_v1
+```
+
+**Manifest format:**
+
+```json
+{
+  "name": "fineweb_edu_sample_10k",
+  "source": "HuggingFaceFW/fineweb-edu",
+  "split": "train",
+  "streaming": true,
+  "sample_count": 10000,
+  "sample_seed": 1234,
+  "created_at": "2026-05-04",
+  "format": "jsonl",
+  "checksum": "..."
+}
+```
+
+**Pin these fields for reproducibility:** dataset name, source, revision/commit hash, download date, split, sample seed, row IDs, license notes, checksum.
+
+### 3.4 Training Data (`training/`)
+
+Prepared training datasets: SFT, DPO/ORPO preference data, LoRA fine-tuning data, continued-pretraining shards.
+
+**Pattern (flat):**
+
+```text
+/mnt/datasets-big/training/local_agent_sft_v1/
+  train.jsonl
+  validation.jsonl
+  MANIFEST.json
+```
+
+**Pattern (sharded):**
+
+```text
+/mnt/datasets-big/training/openwebmath_sample_v1/
+  shard-00000.parquet
+  shard-00001.parquet
+  MANIFEST.json
+```
+
+### 3.5 Tokenized Data (`tokenized/`)
+
+Pre-tokenized and packed datasets ready for faster training runs. Avoids repeated CPU-heavy tokenization.
+
+**Organize by tokenizer/model family:**
+
+```text
+/mnt/datasets-big/tokenized/qwen3_tokenizer/local_agent_sft_v1/
+/mnt/datasets-big/tokenized/qwen3_tokenizer/openwebmath_sample_v1/
+```
+
+**Regenerate when:** tokenizer changes, chat template changes, max sequence length changes, packing strategy changes.
+
+### 3.6 Pipeline (local SSD only)
+
+Intermediate processing pipeline — **not on external drive**. Final output goes to `/mnt/datasets-big/tokenized/`.
+
+```text
+~/datasets/pipeline/   (local SSD only)
+  raw/
+  clean/
+  formatted/
+  tokenized/           → final output goes to /mnt/datasets-big/tokenized/
+  packed/
+  manifests/
+```
+
+### 3.7 Benchmark Runs Archive (`benchmark-runs-archive/`)
+
+Older benchmark run outputs, logs, reports, raw responses, and artifacts. Use internal NVMe for active/current runs, then archive here.
+
+Examples: raw model responses, judge outputs, SQLite snapshots, HTML/Markdown reports, timing summaries, stderr/stdout logs.
+
+### 3.8 Models Archive (`models-archive/`)
+
+Inactive or experimental model checkpoints — large archives, backup copies, rarely used snapshots.
+
+**Keep on internal NVMe when:** frequent/default use (maxbrain, current coding model).
+**Put on external drive when:** occasional use, internal space is tight.
+
+**Impact of external drive on model loading:**
+
+```text
+Cold startup:   likely slower (+30–90s depending enclosure/thermal behavior)
+Warm inference: effectively unchanged
+Decode speed:   effectively unchanged
+```
+
+---
+
+## 4. Storage Hierarchy Strategy
 
 ```text
 1. Small benchmark data
    → vendor into the repo or cache locally as JSONL/Parquet
 
 2. Medium repeated benchmark data
-   → download once to a user-owned local dataset cache
+   → download once to /mnt/datasets-big/evals/ or /mnt/datasets-big/training/
 
 3. Huge training/pretraining data
    → stream or pre-shard, then cache only the subset you actually use
 ```
 
-The main thing I would avoid is repeatedly pulling huge datasets from Hugging Face during every run. That makes benchmark results noisy, creates network dependency, and can pollute your timing numbers.
+Avoid repeatedly pulling huge datasets from HuggingFace during every run. That makes benchmark results noisy, creates network dependency, and can pollute timing numbers.
 
 ---
 
-# 1. For benchmark runs: local, pinned, reproducible subsets
+## 5. Dataset Access Patterns by Use Case
 
-For quality benchmarking, you usually do **not** need the whole dataset. You need a fixed, representative, reproducible slice.
-
-For example:
+### A. Public eval benchmark
 
 ```text
-MMLU-Pro       → fixed 500–2,000 question subset
-GPQA           → full or fixed subset
-IFEval         → full, small enough
-HumanEval      → full
-MBPP           → full or subset
-LiveCodeBench  → pinned release/date range
-Local tasks    → full curated set
+download once → local JSONL/Parquet → pinned manifest
 ```
 
-Recommended layout:
+Why: small enough, reproducible, no network variability, easy to rerun.
+
+```bash
+python scripts/prepare_eval_dataset.py \
+  --dataset mmlu_pro --split test --sample 2000 --seed 1234 \
+  --out /mnt/datasets-big/evals/mmlu_pro_v1
+```
+
+### B. Long-context benchmark
 
 ```text
-/mnt/datasets-big/
-  evals/
-    mmlu_pro/
-      mmlu_pro_2026-05-04_subset.jsonl
-      MANIFEST.json
-    gpqa/
-    ifeval/
-    humaneval/
-    mbpp/
-    local_coding/
-  training/
-    fineweb_edu/
-    openwebmath/
-    stack_v2/
-  cache/
-    hf/
-    tokenized/
+local source docs/logs/code → generated context packs → cached prompt files
 ```
-
-For evals, pin:
 
 ```text
-dataset name
-source
-revision / commit hash if available
-download date
-split
-sample seed
-row ids
-license notes
-checksum
+/mnt/datasets-big/evals/long_context_v1/
+  contexts/
+    qwen3_replicate_032k.txt
+    qwen3_replicate_064k.txt
+    qwen3_replicate_128k.txt
+  tasks.jsonl
+  MANIFEST.json
 ```
 
-That lets you say:
+Why: context packing should be deterministic, token counts known before run, do not rebuild 128k prompts every benchmark.
+
+### C. SFT / LoRA training
 
 ```text
-agent-code scored 72.4 on local_coding_v1
+local sharded JSONL/Parquet → pre-tokenized cache → packed sequences
 ```
 
-and actually know what that means six weeks later.
+Keep raw text and formatted chat examples. Also keep tokenized/packed cache. Regenerate only when tokenizer, max length, or formatting changes.
 
----
+### D. Continued pretraining
 
-# 2. For large Hugging Face datasets: use streaming for exploration, local cache for real runs
+```text
+stream massive dataset → filter/sample/shard locally → train from local shards
+```
 
-Hugging Face `datasets` supports streaming so you can iterate over examples without downloading the full dataset first. That is good for exploration or one-off sampling, especially when the dataset exceeds local disk. ([Hugging Face][1])
+Do not mirror all of FineWeb/OpenWebMath/The Stack unless truly needed. Pull a high-quality slice.
 
-Example:
+### E. One-off exploration
+
+Use HF streaming. This is the right place for streaming:
 
 ```python
 from datasets import load_dataset
@@ -102,83 +284,11 @@ for i, row in enumerate(ds):
         break
 ```
 
-But for **benchmarking**, I would not stream live from the internet during the measured run. Instead:
-
-```text
-stream once
-→ sample deterministic subset
-→ write local JSONL/Parquet
-→ benchmark from local disk
-```
-
-Example sampler:
-
-```python
-from datasets import load_dataset
-import json
-from itertools import islice
-
-OUT = "/mnt/datasets-big/evals/fineweb_edu_sample_10k.jsonl"
-
-ds = load_dataset(
-    "HuggingFaceFW/fineweb-edu",
-    split="train",
-    streaming=True,
-)
-
-with open(OUT, "w", encoding="utf-8") as f:
-    for row in islice(ds, 10_000):
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
-```
-
-Then your benchmark harness reads:
-
-```text
-/mnt/datasets-big/evals/fineweb_edu_sample_10k.jsonl
-```
-
-not the remote dataset.
-
 ---
 
-# 3. Put Hugging Face cache somewhere explicit and user-owned
+## 6. Data Format Guidelines
 
-Given your prior Docker/HF cache permission issues, I’d avoid letting each container invent its own root-owned cache.
-
-The external drive at `/mnt/datasets-big/hf-cache/` already has the correct subdirectories. Set:
-
-```bash
-export HF_HOME=/mnt/datasets-big/hf-cache/huggingface
-export HF_DATASETS_CACHE=/mnt/datasets-big/hf-cache/datasets
-export HF_HUB_CACHE=/mnt/datasets-big/hf-cache/hub
-
-For Docker Compose, mount it read/write for data-prep containers:
-
-```yaml
-volumes:
-  - /mnt/datasets-big:/datasets
-  - /mnt/datasets-big/hf-cache/huggingface:/root/.cache/huggingface
-
-environment:
-  HF_HOME: /root/.cache/huggingface
-  HF_DATASETS_CACHE: /datasets/cache/hf_datasets
-  HF_HUB_CACHE: /datasets/cache/hf_hub
-```
-
-For training containers, I’d often mount prepared eval datasets read-only:
-
-```yaml
-volumes:
-  - /mnt/datasets-big/evals:/datasets/evals:ro
-  - /mnt/datasets-big/training:/datasets/training:ro
-  - /mnt/datasets-big/hf-cache:/datasets/cache
-```
-
----
-
-# 4. Use Parquet/Arrow/JSONL for evals; use shards for training
-
-For benchmark evals, keep it simple:
+### Benchmark evals
 
 ```text
 JSONL    → easiest to inspect, diff, and version
@@ -187,7 +297,9 @@ Arrow    → good with Hugging Face datasets
 SQLite   → good for task registry / metadata, not huge text corpora
 ```
 
-For training, avoid millions of tiny files. Use sharded formats:
+### Training data
+
+Avoid millions of tiny files. Use sharded formats:
 
 ```text
 Parquet shards
@@ -196,70 +308,26 @@ WebDataset tar shards
 HF Arrow cache
 ```
 
-WebDataset is specifically built around TAR shards; large datasets are split into many shard files, often around ~1GB each, and streamed sequentially. ([GitHub][3]) PyTorch’s own blog also describes WebDataset as a solution for large datasets and many-file I/O problems in PyTorch. ([PyTorch][4])
+WebDataset splits large datasets into many shard files (~1GB each), streamed sequentially. PyTorch describes it as a solution for large datasets and many-file I/O problems.
 
-Good training layout:
+**Good training layout:**
 
 ```text
-/mnt/datasets-big/training/
-  code_sft_v1/
-    shard-00000.jsonl.gz
-    shard-00001.jsonl.gz
-    manifest.json
-  openwebmath_sample_v1/
-    shard-00000.parquet
-    shard-00001.parquet
-    manifest.json
-  local_agent_traces_v1/
-    train.jsonl
-    validation.jsonl
-    manifest.json
+/mnt/datasets-big/training/code_sft_v1/
+  shard-00000.jsonl.gz
+  shard-00001.jsonl.gz
+  MANIFEST.json
+/mnt/datasets-big/training/openwebmath_sample_v1/
+  shard-00000.parquet
+  shard-00001.parquet
+  MANIFEST.json
 ```
 
 ---
 
-# 5. Separate “raw”, “clean”, “tokenized”, and “packed”
+## 7. Dataset Registry
 
-For training, especially if you fine-tune, use a pipeline like:
-
-```text
-raw downloaded data
-→ cleaned / filtered text
-→ formatted training examples
-→ tokenized examples
-→ packed sequences
-```
-
-Suggested layout:
-
-```text
-~/datasets/pipeline/   (local SSD only — intermediate processing, not on external drive)
-  raw/
-  clean/
-  formatted/
-  tokenized/           → final output goes to /mnt/datasets-big/tokenized/
-  packed/
-  manifests/
-```
-
-Do **not** tokenize repeatedly during every training run. Tokenization is CPU-heavy and can create noise. Tokenize once per tokenizer/model family and reuse.
-
-Example:
-
-```text
-/mnt/datasets-big/tokenized/
-  qwen3_tokenizer/
-    local_agent_sft_v1/
-    openwebmath_sample_v1/
-```
-
-For Qwen-family experiments, tokenized caches are especially useful because you may compare several Qwen variants with the same tokenizer or closely related tokenizers.
-
----
-
-# 6. For your benchmark harness, add a dataset registry
-
-Your harness should not hardcode dataset paths. Add something like:
+The harness should not hardcode dataset paths. Add a registry:
 
 ```yaml
 datasets:
@@ -276,7 +344,7 @@ datasets:
   fineweb_edu_sample_10k:
     type: jsonl
     path: /mnt/datasets-big/evals/fineweb_edu_sample_10k.jsonl
-    manifest: /mnt/datasets-big/evals/fineweb_edu_sample_10k.MANIFEST.json
+    manifest: /mnt/datasets-big/evals/fineweb_edu_sample_10k/MANIFEST.json
 ```
 
 Each manifest should include:
@@ -295,133 +363,45 @@ Each manifest should include:
 }
 ```
 
-Then benchmark runs store:
-
-```text
-dataset_id
-dataset_manifest_hash
-task_id
-task_version
-```
-
-That makes runs reproducible.
+Benchmark runs store: `dataset_id`, `dataset_manifest_hash`, `task_id`, `task_version`. This makes runs reproducible.
 
 ---
 
-# 7. Recommended DGX Spark access pattern by use case
-
-## A. Public eval benchmark
-
-Use:
-
-```text
-download once → local JSONL/Parquet → pinned manifest
-```
-
-Why:
-
-```text
-small enough
-reproducible
-no network variability
-easy to rerun
-```
-
-Command pattern:
+## 8. Environment Variables
 
 ```bash
-python scripts/prepare_eval_dataset.py \
-  --dataset mmlu_pro \
-  --split test \
-  --sample 2000 \
-  --seed 1234 \
-  --out /mnt/datasets-big/evals/mmlu_pro_v1
+# External dataset/cache drive
+export DATASETS_BIG=/mnt/datasets-big
+export HF_HOME=/mnt/datasets-big/hf-cache/huggingface
+export HF_DATASETS_CACHE=/mnt/datasets-big/hf-cache/datasets
+export HF_HUB_CACHE=/mnt/datasets-big/hf-cache/hub
 ```
 
-Then:
+Add to `~/.bashrc` and run `source ~/.bashrc`. Verify with:
 
 ```bash
-python -m bench_harness run \
-  --suite public_baseline \
-  --dataset mmlu_pro_v1 \
-  --models agent-code,qwen-dense,max-brain
+echo $DATASETS_BIG
+echo $HF_HOME
+echo $HF_DATASETS_CACHE
+echo $HF_HUB_CACHE
 ```
 
-## B. Long-context benchmark
+### Symlink convenience (optional)
 
-Use:
-
-```text
-local source docs/logs/code
-→ generated context packs
-→ cached prompt files
+```bash
+mkdir -p ~/datasets
+ln -sfn /mnt/datasets-big/evals ~/datasets/evals
+ln -sfn /mnt/datasets-big/training ~/datasets/training
+ln -sfn /mnt/datasets-big/hf-cache ~/datasets/cache
+ln -sfn /mnt/datasets-big/raw ~/datasets/raw
+ln -sfn /mnt/datasets-big/tokenized ~/datasets/tokenized
 ```
-
-Layout:
-
-```text
-/mnt/datasets-big/evals/long_context_v1/
-  contexts/
-    qwen3_replicate_032k.txt
-    qwen3_replicate_064k.txt
-    qwen3_replicate_128k.txt
-  tasks.jsonl
-  manifest.json
-```
-
-Why:
-
-```text
-context packing should be deterministic
-token counts should be known before the run
-you do not want to rebuild 128k prompts every benchmark
-```
-
-## C. SFT / LoRA training
-
-Use:
-
-```text
-local sharded JSONL/Parquet
-→ pre-tokenized cache
-→ packed sequences
-```
-
-Recommended:
-
-```text
-Keep raw text and formatted chat examples.
-Also keep tokenized/packed cache.
-Regenerate tokenized cache only when tokenizer, max length, or formatting changes.
-```
-
-## D. Continued pretraining
-
-Use:
-
-```text
-stream massive dataset
-→ filter/sample/shard locally
-→ train from local shards
-```
-
-Do not attempt to mirror all of FineWeb/OpenWebMath/The Stack unless you truly need it. Pull a high-quality slice.
-
-## E. One-off exploration
-
-Use:
-
-```text
-HF streaming
-```
-
-This is the right place for streaming.
 
 ---
 
-# 8. Practical Docker Compose pattern
+## 9. Docker Compose Patterns
 
-For a benchmark/data-prep container:
+### Data-prep / benchmark containers
 
 ```yaml
 services:
@@ -430,18 +410,19 @@ services:
     container_name: benchmark-harness
     volumes:
       - /home/njalbicelli/research/benchmark-harness:/workspace
-      - /mnt/datasets-big:/datasets
+      - /mnt/datasets-big:/datasets-big
       - /mnt/datasets-big/hf-cache/huggingface:/root/.cache/huggingface
     environment:
-      HF_HOME: /root/.cache/huggingface
-      HF_DATASETS_CACHE: /datasets/cache/hf_datasets
-      HF_HUB_CACHE: /datasets/cache/hf_hub
+      DATASETS_BIG: /datasets-big
+      HF_HOME: /datasets-big/hf-cache/huggingface
+      HF_DATASETS_CACHE: /datasets-big/hf-cache/datasets
+      HF_HUB_CACHE: /datasets-big/hf-cache/hub
     working_dir: /workspace
     extra_hosts:
       - "host.docker.internal:host-gateway"
 ```
 
-Then point at LiteLLM:
+Point at LiteLLM from inside the container:
 
 ```text
 http://host.docker.internal:4000/v1
@@ -453,38 +434,76 @@ or from the host directly:
 http://spark-e287.local:4000/v1
 ```
 
----
+### Training containers (read-only dataset mounts)
 
-# 9. Storage recommendation
-
-I’d use something like this:
-
-```text
-/mnt/datasets-big
-  /hf-cache
-    /huggingface
-    /datasets
-    /hub
-  /tokenized
-  /evals
-    /smoke_v1
-    /coding_smoke_v1
-    /local_coding_v1
-    /long_context_v1
-    /public_baseline_v1
-  /training
-    /local_agent_sft_v1
-    /local_agent_dpo_v1
-    /openwebmath_sample_v1
-    /fineweb_edu_sample_v1
-    /stack_v2_code_sample_v1
-  /raw
-    /hf_downloads
-  /models-archive
-  /benchmark-runs-archive
+```yaml
+volumes:
+  - /mnt/datasets-big/evals:/datasets/evals:ro
+  - /mnt/datasets-big/training:/datasets/training:ro
+  - /mnt/datasets-big/hf-cache:/datasets/cache
 ```
 
-And in git, commit only:
+### HF cache with internal path mapping
+
+For containers that expect Hugging Face cache at `/root/.cache/huggingface`:
+
+```yaml
+volumes:
+  - /mnt/datasets-big/hf-cache/huggingface:/root/.cache/huggingface
+```
+
+---
+
+## 10. Model Weight Placement Policy
+
+### Internal NVMe (hot models)
+
+Keep frequently used or startup-sensitive models on internal NVMe:
+
+- `agent-code`, `qwen-dense`, current default coding model
+- Frequently used max-brain if startup time matters
+
+Benefits: faster cold load, less USB/mount risk, better reliability for always-on services, simpler Docker startup.
+
+### External drive (cold/experimental models)
+
+Use for: inactive snapshots, experimental checkpoints, rarely loaded variants, large archives, backup copies of HF snapshots.
+
+### Max-brain / Qwen3.5 122B guidance
+
+```text
+If maxbrain is frequent/default:     keep it internal.
+If maxbrain is occasional + internal space tight: external is acceptable.
+```
+
+---
+
+## 11. Safety & Operational Notes
+
+**Never run `mkfs` against:**
+
+```text
+/dev/nvme0n1
+/dev/nvme0n1p1
+/dev/nvme0n1p2
+```
+
+Always inspect before formatting:
+
+```bash
+lsblk -o NAME,SIZE,TYPE,FSTYPE,LABEL,MOUNTPOINTS,MODEL,SERIAL
+df -h
+```
+
+**Use label-based mounting** rather than raw device names. `LABEL=datasets-big` is safer because `/dev/sda` can change depending on boot order.
+
+---
+
+## 12. Storage Hygiene
+
+### Git tracking
+
+**Commit:**
 
 ```text
 dataset registry YAML
@@ -494,7 +513,7 @@ scripts
 checksums
 ```
 
-Do **not** commit:
+**Do NOT commit:**
 
 ```text
 large JSONL
@@ -504,19 +523,80 @@ tokenized cache
 benchmark run artifacts
 ```
 
+### Retention policy
+
+- Keep active runs on internal NVMe while in use.
+- Archive completed runs to `/mnt/datasets-big/benchmark-runs-archive`.
+- Compress old raw responses if space grows too large.
+- Keep manifests/checksums even if deleting bulky raw artifacts.
+- Do not let HF cache silently consume the root filesystem.
+
+### Future CLI: `storage report`
+
+```bash
+python -m bench_harness storage report
+```
+
+Should report: dataset sizes, HF cache size, tokenized cache size, benchmark run artifact size, largest runs/datasets, available space on internal and external drives.
+
 ---
 
-# 10. My concrete recommendation for your next step
+## 13. Performance Expectations
 
-For your benchmark harness project, implement dataset access in this order:
+External USB4 NVMe practical throughput is lower than internal NVMe but fast enough for dataset/cache use:
 
-## Step 1
+```text
+benchmark dataset reads:     excellent
+Parquet/JSONL shard reads:   excellent
+HF dataset cache:            excellent
+model cold load:             slower than internal, acceptable for occasional models
+warm model inference:        no meaningful difference once loaded
+heavy repeated tokenization: acceptable on TLC drives; avoid QLC if possible
+```
 
-Create:
+---
+
+## 14. Summary: Storage Recommendation
+
+**External drive (`/mnt/datasets-big/`) — primary use:**
+
+```text
+large dataset store
+HF dataset/model cache overflow
+training shard store
+tokenized dataset cache
+benchmark archive
+inactive model archive
+```
+
+**Internal NVMe — primary use:**
+
+```text
+hot model serving storage
+active coding/model repos
+active benchmark runs
+latency-sensitive model weights
+Docker runtime and current compose stacks
+```
+
+**Rule of thumb:**
+
+```text
+Benchmarking:        never depend on live streaming during measured runs
+Fine-tuning:         train from local shards, preferably pre-tokenized
+Huge corpus explore: use HF streaming, then materialize only the slice you want
+Repeated experiments: pin everything with manifests and checksums
+```
+
+---
+
+## 15. Next Steps
+
+### Step 1
 
 ```bash
 # External drive is already structured at /mnt/datasets-big/
-# Local symlink or mount for convenience:
+# Optional symlink convenience:
 mkdir -p ~/datasets
 ln -sfn /mnt/datasets-big/evals ~/datasets/evals
 ln -sfn /mnt/datasets-big/training ~/datasets/training
@@ -525,7 +605,7 @@ ln -sfn /mnt/datasets-big/raw ~/datasets/raw
 ln -sfn /mnt/datasets-big/tokenized ~/datasets/tokenized
 ```
 
-Add to shell profile:
+Add HF env vars to `~/.bashrc`:
 
 ```bash
 export HF_HOME=/mnt/datasets-big/hf-cache/huggingface
@@ -533,7 +613,7 @@ export HF_DATASETS_CACHE=/mnt/datasets-big/hf-cache/datasets
 export HF_HUB_CACHE=/mnt/datasets-big/hf-cache/hub
 ```
 
-## Step 2
+### Step 2
 
 Build a small local eval dataset:
 
@@ -542,49 +622,18 @@ Build a small local eval dataset:
 /mnt/datasets-big/evals/coding_smoke_v1/MANIFEST.json
 ```
 
-## Step 3
+### Step 3
 
 Add `configs/datasets.yaml` to the harness.
 
-## Step 4
+### Step 4
 
 Write `prepare_dataset.py` that can:
 
 ```text
-download/stream
-sample
-write JSONL/Parquet
-write manifest
-compute checksum
+download/stream → sample → write JSONL/Parquet → write manifest → compute checksum
 ```
 
-## Step 5
+### Step 5
 
 Make benchmark runs use only registered local datasets.
-
----
-
-## Rule of thumb
-
-For the Spark:
-
-```text
-Benchmarking:
-  never depend on live streaming during measured runs
-
-Fine-tuning:
-  train from local shards, preferably pre-tokenized
-
-Huge corpus exploration:
-  use HF streaming, then materialize only the slice you want
-
-Repeated experiments:
-  pin everything with manifests and checksums
-```
-
-That gives you clean timing numbers, reproducible quality comparisons, and a sane path from eval failures into training data.
-
-[1]: https://huggingface.co/docs/datasets/stream?utm_source=chatgpt.com "Stream"
-[2]: https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables?utm_source=chatgpt.com "Environment variables"
-[3]: https://github.com/webdataset/webdataset?utm_source=chatgpt.com "webdataset/webdataset: A high-performance Python- ..."
-[4]: https://pytorch.org/blog/efficient-pytorch-io-library-for-large-datasets-many-files-many-gpus/?utm_source=chatgpt.com "Efficient PyTorch I/O library for Large Datasets, Many Files, ..."
