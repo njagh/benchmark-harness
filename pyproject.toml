@@ -1,0 +1,52 @@
+[project]
+name = "bench-harness"
+version = "0.1.0"
+description = "Local LLM quality benchmark harness"
+requires-python = ">=3.12"
+dependencies = [
+    "typer[all]",
+    "rich",
+    "pyyaml",
+    "pydantic",
+    "openai",
+    "httpx",
+    "sqlite-utils",
+    "jsonschema",
+    "jinja2",
+    "unidiff",
+    "pytest",
+    "pytest-asyncio",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+]
+coding = [
+    # bigcode-evaluation-hub, evalplus — heavier deps, install per-need
+]
+analysis = [
+    "duckdb",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+    "great-tables",
+]
+long-context = [
+    "nvidia-ml-py",
+    "transformers",
+]
+
+[project.scripts]
+bench-harness = "bench_harness.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+src = ["src"]
+line-length = 120
