@@ -23,7 +23,7 @@ Phase C — Deep model/backend comparison (Milestone 2 of 4 in phase)
 Per STORAGE_PLAN.md: quantization comparison runs require pinned, reproducible datasets. Each quantized variant runs against the same local dataset copies:
 
 ```
-~/datasets/evals/quant_comparison_v1/
+/mnt/datasets-big/evals/quant_comparison_v1/
   tasks.jsonl
   manifest.json
 ```

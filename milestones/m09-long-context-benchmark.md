@@ -22,12 +22,12 @@ Phase C — Deep model/backend comparison (Milestone 1 of 4 in phase)
 
 **Context packing:**
 - **transformers.AutoTokenizer**: Use HuggingFace transformers tokenizer for accurate token counting during context packing. Load tokenizer once, cache it. Do NOT load per-task.
-- The tokenizer for Qwen-family models should be loaded from the local HF cache (`~/datasets/cache/huggingface/`), not downloaded live.
+- The tokenizer for Qwen-family models should be loaded from the local HF cache (`/mnt/datasets-big/hf-cache/huggingface/`), not downloaded live.
 
 **Context cache (STORAGE_PLAN):**
 Per STORAGE_PLAN.md section 7B (Long-context benchmark):
 ```
-~/datasets/evals/long_context_v1/
+/mnt/datasets-big/evals/long_context_v1/
   contexts/
     qwen3_replicate_032k.txt
     qwen3_replicate_064k.txt
@@ -38,7 +38,7 @@ Per STORAGE_PLAN.md section 7B (Long-context benchmark):
 - Context packing is deterministic and should be cached
 - Token counts should be known before the run
 - Do not rebuild 128k prompts every benchmark
-- Packed contexts are stored in `~/datasets/evals/long_context_v1/contexts/` and registered in `configs/datasets.yaml`
+- Packed contexts are stored in `/mnt/datasets-big/evals/long_context_v1/contexts/` and registered in `configs/datasets.yaml`
 
 **GPU monitoring:**
 - Use `pynvml` (NVIDIA Management Library) for GPU metrics instead of shell-out to `nvidia-smi`. It's faster, more reliable, and returns structured data.
@@ -113,9 +113,9 @@ class ContextPacker:
     def __init__(self, filler_dirs: list[str], tokenizer_name: str = "Qwen/Qwen2.5-7B"):
         self.filler_dirs = filler_dirs
         # Load tokenizer from HF local cache, not from the internet.
-        # Set HF_HOME=/home/njalbicelli/datasets/cache/huggingface before calling AutoTokenizer.from_pretrained().
+        # Set HF_HOME=/mnt/datasets-big/hf-cache/huggingface before calling AutoTokenizer.from_pretrained().
         import os
-        os.environ["HF_HOME"] = "/home/njalbicelli/datasets/cache/huggingface"
+        os.environ["HF_HOME"] = "/mnt/datasets-big/hf-cache/huggingface"
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
     def load_fillers(self, source: str) -> list[str]:

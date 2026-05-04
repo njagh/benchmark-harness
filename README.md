@@ -92,8 +92,8 @@ python -m bench_harness run \
 
 Per `STORAGE_PLAN.md`:
 
-- External eval data lives in `~/datasets/evals/` — pinned local copies with manifests
-- HF cache at `~/datasets/cache/huggingface/` — set `HF_HOME` before any HF downloads
+- External eval data lives in `/mnt/datasets-big/evals/` — pinned local copies with manifests
+- HF cache at `/mnt/datasets-big/hf-cache/` — set `HF_HOME` etc. before any HF downloads
 - No live streaming from HuggingFace during measured runs
 - Dataset registry in `configs/datasets.yaml`
 

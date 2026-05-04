@@ -489,7 +489,7 @@ scorers:
 
 Google's IFEval benchmark (https://github.com/google-research/google-research/tree/master/instruction_following_eval) provides a standardized instruction-following test suite. Rather than reimplementing IFEval's prompt templates and scoring logic, the harness should:
 
-1. Download IFEval data once to `~/datasets/evals/ifeval_v1/`
+1. Download IFEval data once to `/mnt/datasets-big/evals/ifeval_v1/`
 2. Run IFEval as a suite using the harness's runner infrastructure
 3. Store IFEval results in the harness SQLite database alongside local tasks
 4. Use IFEval's own prompt format but score through the harness's scorers

@@ -23,7 +23,7 @@ Phase D — Data flywheel (Milestone 1 of 4 in phase)
 Exported training data follows STORAGE_PLAN.md layout:
 
 ```
-~/datasets/training/
+/mnt/datasets-big/training/
   local_agent_sft_v1/
     train.jsonl
     validation.jsonl

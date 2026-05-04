@@ -27,7 +27,7 @@ The roadmap (§6.2) references IFEval, MMLU-Pro, GPQA, BBH, MATH, HumanEval, and
 4. This avoids duplicating thousands of benchmark tasks and their scoring logic
 
 **Dataset access (STORAGE_PLAN):**
-- All external benchmark data follows the STORAGE_PLAN.md layout: `~/datasets/evals/` for pinned local copies
+- All external benchmark data follows the STORAGE_PLAN.md layout: `/mnt/datasets-big/evals/` for pinned local copies
 - Never stream from HuggingFace during measured runs
 - Each dataset has a manifest with source, revision, checksum, and sample metadata
 - The harness reads only from registered local datasets (configs/datasets.yaml)
@@ -35,7 +35,7 @@ The roadmap (§6.2) references IFEval, MMLU-Pro, GPQA, BBH, MATH, HumanEval, and
 **eval_plus for coding tests:**
 - Use `evalplus` (https://github.com/evalplus/eval_plus) for HumanEval+ and MBPP+ test suites
 - These are deobfuscated versions with stronger tests than the originals
-- Download test files once to `~/datasets/evals/evalplus/` and reference locally
+- Download test files once to `/mnt/datasets-big/evals/evalplus/` and reference locally
 
 ---
 

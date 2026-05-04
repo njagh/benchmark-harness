@@ -523,12 +523,12 @@ datasets:
     path: "tasks/coding_smoke"
     description: "Coding regression smoke tasks"
 
-  # External eval data lives in ~/datasets/evals/
+  # External eval data lives in /mnt/datasets-big/evals/
   # These are populated by scripts/prepare_eval_dataset.py (M2+)
   # mmlu_pro_v1:
   #   type: jsonl
-  #   path: "/home/njalbicelli/datasets/evals/mmlu_pro_v1/tasks.jsonl"
-  #   manifest: "/home/njalbicelli/datasets/evals/mmlu_pro_v1/MANIFEST.json"
+  #   path: "/mnt/datasets-big/evals/mmlu_pro_v1/tasks.jsonl"
+  #   manifest: "/mnt/datasets-big/evals/mmlu_pro_v1/MANIFEST.json"
 ```
 
 **File:** `src/bench_harness/config.py` — add function:
@@ -538,8 +538,8 @@ datasets:
 **STORAGE_PLAN integration notes:**
 - Harness never pulls live from HuggingFace during benchmark runs
 - All eval data is downloaded once, pinned with manifest, stored locally
-- `HF_HOME`, `HF_DATASETS_CACHE`, `HF_HUB_CACHE` env vars documented in `.env.example`
-- Dataset paths use `~/datasets/evals/` for external data, `tasks/` for local YAML tasks
+- `HF_HOME`, `HF_DATASETS_CACHE`, `HF_HUB_CACHE` env vars documented in `.env.example` pointing to `/mnt/datasets-big/hf-cache/`
+- Dataset paths use `/mnt/datasets-big/evals/` for external data, `tasks/` for local YAML tasks
 
 **Actions:**
 - [ ] Create configs/datasets.yaml
