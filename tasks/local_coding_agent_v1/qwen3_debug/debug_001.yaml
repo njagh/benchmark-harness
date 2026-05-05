@@ -1,0 +1,46 @@
+id: local.qwen3_debug.debug_001
+family: qwen3_debug
+prompt: |
+  The qwen3 replicate service crashes on startup with a CUDA out-of-memory error. Fix the config.
+
+  ```yaml
+  service_config:
+    model: Qwen/Qwen2.5-72B-Instruct
+    gpu: 0
+    memory:
+      vram_limit_mb: 8192
+      cpu_memory_mb: 2048
+    device: cuda
+    dtype: float16
+    max_batch_size: 32
+  inference:
+    max_new_tokens: 2048
+    temperature: 0.7
+    top_p: 0.9
+  ```
+
+  Produce a corrected version with:
+  1. Increase vram_limit_mb to at least 48000 for a 72B model (requires ~144GB with FP16)
+  2. Enable memory-efficient loading with `dtype: bfloat16`
+  3. Reduce max_batch_size to 4 for OOM safety
+  4. Add offloading configuration to use CPU memory as fallback
+  5. Set `max_new_tokens` to 1024 to reduce peak memory during generation
+  6. Add a `max_memory` config that respects available GPU memory
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "memory"
+    - "gpu"
+    - "cuda"
+    - "offload"
+    - "bfloat16"
+  absent_patterns:
+    - "vram_limit_mb: 8192"
+    - "max_batch_size: 32"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

@@ -1,0 +1,43 @@
+id: local.git_linux.git_002
+family: git_linux
+prompt: |
+  Create a git post-push script that runs smoke tests and sends Slack notifications.
+
+  ```bash
+  #!/usr/bin/env bash
+  # Post-push smoke testing script
+
+  BRANCH=$1
+  REPO_URL=$2
+
+  # TODO: Add smoke tests
+  # TODO: Send Slack notification
+
+  echo "Push to $BRANCH detected"
+  ```
+
+  Produce a complete post-push script with:
+  1. Run a smoke test suite: `pytest tests/smoke/ -v --tb=short`
+  2. If smoke tests pass, send a Slack webhook notification with push details (branch, commit, user, timestamp)
+  3. If smoke tests fail, send an urgent Slack alert with failure output
+  4. Use `curl` to send Slack messages with proper JSON payload format
+  5. Add a `SLACK_WEBHOOK_URL` environment variable reference
+  6. Add a `--notify` flag to disable notifications for routine pushes
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "slack"
+    - "curl"
+    - "smoke"
+    - "pytest"
+    - "webhook"
+    - "json"
+  absent_patterns:
+    - "TODO"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

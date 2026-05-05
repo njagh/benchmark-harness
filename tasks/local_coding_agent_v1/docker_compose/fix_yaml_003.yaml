@@ -1,0 +1,32 @@
+id: local.docker_compose.fix_yaml_003
+family: docker_compose
+prompt: |
+  Fix the healthcheck configuration in this docker-compose.yml — healthcheck fails because the command is wrong.
+
+  ```yaml
+  # {{context_files}}
+  ```
+
+  Produce a corrected version with the following fixes:
+  1. The webapp healthcheck uses `wget --spider` but the service may not have wget installed — use `curl` or `python` instead
+  2. The db healthcheck uses `pg_isready` but the `-U postgres` flag may not match the configured user — use the POSTGRES_USER env var
+  3. The webapp healthcheck interval is too long (30s) for a responsive service — reduce to 15s
+  4. Add `--connect-timeout` to healthcheck commands for faster failure detection
+  5. Ensure both healthchecks have consistent retry settings
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "healthcheck:"
+    - "curl"
+    - "pg_isready"
+    - "interval"
+    - "retries"
+  absent_patterns:
+    - "wget"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

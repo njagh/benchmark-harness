@@ -1,0 +1,49 @@
+id: local.litellm_routing.routing_005
+family: litellm_routing
+prompt: |
+  Create a LiteLLM config that supports both OpenAI and local vllm backends with proper base_url overrides.
+
+  ```yaml
+  model_list:
+    - model_name: gpt-4
+      litellm_params:
+        model: openai/gpt-4
+        api_key: ${OPENAI_API_KEY}
+
+    - model_name: local-model
+      litellm_params:
+        model: vllm/meta-llama/Llama-2-7b
+        api_base: https://wrong-url.example.com
+
+    - model_name: azure-gpt
+      litellm_params:
+        model: azure/gpt-4
+        api_base: https://missing-resource.openai.azure.com
+        api_key: ${AZURE_API_KEY}
+        api_version: "2023-05-15"
+  ```
+
+  Produce a corrected version with:
+  1. Fix the vllm api_base to point to `http://localhost:8000/v1` (standard vllm endpoint)
+  2. Fix the Azure api_base to a proper format: `https://<resource-name>.openai.azure.com`
+  3. Add proper model aliases for all three models
+  4. Add base_url overrides for each provider with clear variable references
+  5. Add fallback chain: gpt-4 -> azure-gpt -> local-model
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "base_url"
+    - "openai"
+    - "vllm"
+    - "localhost:8000"
+    - "fallback"
+  absent_patterns:
+    - "wrong-url"
+    - "missing-resource"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

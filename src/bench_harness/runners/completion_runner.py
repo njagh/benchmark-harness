@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -49,6 +50,9 @@ class RunResult:
         exit_code: Pytest exit code (code tasks only).
         generated_code: The code the model generated (code tasks only).
         code_status: Status of generated code (code tasks only).
+        validation_passed: Whether shell/config validation passed (non-code tasks only).
+        validation_command: The validation command that was run (non-code tasks only).
+        validation_output: Raw output from validation command (non-code tasks only).
     """
 
     run_id: str
@@ -84,6 +88,9 @@ class RunResult:
     exit_code: int | None = None
     generated_code: str | None = None
     code_status: str | None = None
+    validation_passed: bool | None = None
+    validation_command: str | None = None
+    validation_output: str | None = None
 
 
 class CompletionRunner:
@@ -210,6 +217,18 @@ class CompletionRunner:
             primary_explanation = None
             secondary_scores: dict[str, Any] = {}
 
+            # Check for validation command (non-code tasks)
+            validation_command = task.get("validation_command") or task.get("expected", {}).get("validation_command")
+            validation_allowlist = task.get("validation_allowlist", [])
+            validation_passed = None
+            validation_output = None
+
+            if validation_command:
+                shell_result = self._run_validation_command(validation_command, validation_allowlist, content)
+                if shell_result:
+                    validation_passed = shell_result.get("passed")
+                    validation_output = shell_result.get("stdout", "") + shell_result.get("stderr", "")
+
             if scorer_names:
                 from bench_harness.scorers import score_all, get_scorer
                 try:
@@ -268,6 +287,9 @@ class CompletionRunner:
                 score_explanation=primary_explanation,
                 exit_status="success",
                 created_at=start_time.isoformat(),
+                validation_passed=validation_passed,
+                validation_command=validation_command,
+                validation_output=validation_output,
             )
 
         except Exception as e:
@@ -452,6 +474,41 @@ class CompletionRunner:
             )
 
         return result
+
+    def _run_validation_command(
+        self,
+        command: str,
+        allowlist: list[str],
+        response_content: str,
+    ) -> dict[str, Any] | None:
+        """Run a validation command against the generated response.
+
+        Writes the response to a temp file and runs the validation
+        command in that directory.
+
+        Args:
+            command: The validation shell command to run.
+            allowlist: List of allowed command prefixes.
+            response_content: The model's response content.
+
+        Returns:
+            Dict with pass/fail results, or None if ShellRunner fails.
+        """
+        try:
+            from bench_harness.runners.shell_runner import ShellRunner
+
+            runner = ShellRunner(allowlist=allowlist)
+            with tempfile.TemporaryDirectory(prefix="validation_") as tmpdir:
+                return runner.run(command, tmpdir)
+        except Exception as e:
+            logger.warning("Validation command '%s' failed: %s", command, e)
+            return {
+                "passed": False,
+                "stdout": "",
+                "stderr": str(e),
+                "exit_code": -1,
+                "duration_ms": 0,
+            }
 
     def _run_code_task_sync(
         self,

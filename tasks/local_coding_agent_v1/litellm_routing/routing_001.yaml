@@ -1,0 +1,32 @@
+id: local.litellm_routing.routing_001
+family: litellm_routing
+prompt: |
+  Write a LiteLLM router config that routes /api/* to vllm and /chat/* to openai-compatible with fallback.
+
+  Produce a complete LiteLLM proxy/router configuration that includes:
+  1. A routing table mapping /api/* requests to a vllm backend endpoint
+  2. A routing table mapping /chat/* requests to an openai-compatible backend
+  3. A fallback model defined for when the primary model is unavailable
+  4. Health check endpoints for both backends
+  5. Proper retry configuration with max_retries set to 3
+  6. Request timeout set to 30s
+
+  The config should use YAML format compatible with LiteLLM proxy configuration.
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "router"
+    - "routing"
+    - "/api/"
+    - "/chat/"
+    - "fallback"
+    - "vllm"
+  absent_patterns:
+    - "undefined"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

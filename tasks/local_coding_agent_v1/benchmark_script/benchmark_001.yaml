@@ -1,0 +1,47 @@
+id: local.benchmark_script.benchmark_001
+family: benchmark_script
+prompt: |
+  Fix this benchmark runner script — it doesn't handle failed model endpoints and crashes on timeout.
+
+  ```python
+  import requests
+  import json
+
+  def run_benchmark(tasks, api_endpoint):
+      results = []
+      for task in tasks:
+          response = requests.post(api_endpoint, json={"prompt": task["prompt"]}, timeout=10)
+          data = response.json()
+          results.append({
+              "task_id": task["id"],
+              "completion": data["choices"][0]["text"],
+              "status": "success"
+          })
+      return results
+  ```
+
+  Produce a corrected version with:
+  1. Add try/except blocks around the API call to handle connection errors and timeouts
+  2. Set a proper timeout of 120 seconds for model inference
+  3. Handle HTTP 503 errors by retrying with exponential backoff (max 3 retries)
+  4. Add a timeout exception handler that marks the task as "timeout" status
+  5. Add a general exception handler that marks the task as "error" with the error message
+  6. Add logging for each step of the benchmark run
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "try:"
+    - "except:"
+    - "timeout"
+    - "retry"
+    - "503"
+    - "logging"
+  absent_patterns:
+    - "requests.post(api_endpoint"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

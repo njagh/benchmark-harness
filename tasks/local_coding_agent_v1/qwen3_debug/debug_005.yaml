@@ -1,0 +1,46 @@
+id: local.qwen3_debug.debug_005
+family: qwen3_debug
+prompt: |
+  The qwen3 service fails to load the model because the path is wrong. Fix the model path and loading config.
+
+  ```yaml
+  service_config:
+    model_path: /opt/models/qwen3-7b-instruct
+    model_dir: /wrong/path/to/models/qwen2-7b
+    model_name: Qwen/Qwen2.5-7B-Instruct
+    local_files_only: true
+    trust_remote_code: false
+  loading:
+    device_map: auto
+    torch_dtype: auto
+    low_cpu_mem_usage: true
+    revision: main
+    cache_dir: /tmp/model_cache
+  ```
+
+  Produce a corrected version with:
+  1. Fix model_path to a valid directory: `/opt/models/Qwen2.5-7B-Instruct`
+  2. Fix model_dir to match the correct model name (Qwen2.5 not Qwen2)
+  3. Set `trust_remote_code: true` since qwen3 requires it
+  4. Set `local_files_only: false` to allow downloading from the hub when cache miss occurs
+  5. Add `tokenizer_path` config pointing to the correct tokenizer location
+  6. Add a `model_loading_timeout` of 600 seconds for large model downloads
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "model_path"
+    - "model_dir"
+    - "trust_remote_code"
+    - "tokenizer"
+    - "Qwen2.5"
+  absent_patterns:
+    - "/wrong/path"
+    - "Qwen2-7b"
+    - "trust_remote_code: false"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

@@ -1,0 +1,45 @@
+id: local.git_linux.linux_001
+family: git_linux
+prompt: |
+  Fix this systemd service file — the service fails to start because of wrong working directory and missing environment file.
+
+  ```ini
+  [Unit]
+  Description=Qwen3 Inference Service
+  After=network.target
+
+  [Service]
+  Type=simple
+  User=qwen
+  ExecStart=/usr/bin/python3 /opt/qwen3/run_server.py
+  Restart=always
+  RestartSec=5
+
+  [Install]
+  WantedBy=multi-user.target
+  ```
+
+  Produce a corrected systemd service file with:
+  1. Add `WorkingDirectory=/opt/qwen3` where the script and config live
+  2. Add `EnvironmentFile=/etc/qwen3/service.env` for environment variables
+  3. Create a companion service.env file with: MODEL_PATH, MAX_BATCH_SIZE, LOG_LEVEL
+  4. Add `LimitNOFILE=65536` for high-concurrency inference
+  5. Add `LimitNPROC=4096` for process limits
+  6. Add `StandardOutput=journal` and `StandardError=journal` for logging
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "WorkingDirectory"
+    - "EnvironmentFile"
+    - "MODEL_PATH"
+    - "LimitNOFILE"
+    - "journal"
+  absent_patterns:
+    - "LimitNOFILE=1024"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

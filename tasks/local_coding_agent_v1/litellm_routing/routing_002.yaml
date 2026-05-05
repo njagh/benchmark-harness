@@ -1,0 +1,51 @@
+id: local.litellm_routing.routing_002
+family: litellm_routing
+prompt: |
+  Fix this LiteLLM config — the model alias mapping is broken and TPM limits are not set.
+
+  ```yaml
+  model_list:
+    - model_name: gpt-4
+      litellm_params:
+        model: openai/gpt-4
+      model_alias: gpt-four
+
+    - model_name: gpt-3.5-turbo
+      litellm_params:
+        model: openai/gpt-3.5-turbo
+      model_alias: gpt35
+
+    - model_name: vllm-model
+      litellm_params:
+        model: vllm/localhost:8000/meta-llama/Llama-2-7b
+      model_alias: llama
+
+  litellm_settings:
+    num_retries: 0
+    request_timeout: 5
+  ```
+
+  Produce a corrected version with:
+  1. Fix model_alias references to match between routing and model_list
+  2. Add tpm (tokens per minute) limits for each model
+  3. Increase num_retries to at least 3
+  4. Increase request_timeout to at least 30s for long completions
+  5. Add a fallback model to the configuration
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "model_alias"
+    - "tpm"
+    - "num_retries"
+    - "fallback_model"
+    - "request_timeout"
+  absent_patterns:
+    - "num_retries: 0"
+    - "request_timeout: 5"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

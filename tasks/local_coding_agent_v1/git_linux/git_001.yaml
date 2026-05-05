@@ -1,0 +1,54 @@
+id: local.git_linux.git_001
+family: git_linux
+prompt: |
+  Fix this git hook script — the pre-commit hook blocks all commits because the regex is too strict.
+
+  ```python
+  #!/usr/bin/env python3
+  import re
+  import sys
+
+  def check_commit_message(message):
+      forbidden = re.compile(r"[^\x00-\x7F]+")
+      has_issues = False
+
+      # Check for forbidden characters
+      if forbidden.search(message):
+          print("ERROR: Non-ASCII characters detected!")
+          has_issues = True
+
+      # Check message length
+      if len(message) < 50:
+          print("ERROR: Commit message too short!")
+          has_issues = True
+
+      if has_issues:
+          sys.exit(1)
+      return True
+  ```
+
+  Produce a corrected version with:
+  1. Fix the regex to use `re.search` properly instead of `re.compile` with wrong pattern
+  2. Allow messages between 10-72 characters (conventional commit standard)
+  3. Add support for conventional commit format: `<type>(<scope>): <description>`
+  4. Make the allowed types configurable: feat, fix, docs, style, refactor, test, chore
+  5. Add a `--allow-empty-message` flag support for merge commits
+  6. Fix the logic so issues are warnings, not blockers (unless --strict mode)
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "re.match"
+    - "re.search"
+    - "allowed"
+    - "conventional"
+    - "feat"
+    - "fix"
+  absent_patterns:
+    - "len(message) < 50"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

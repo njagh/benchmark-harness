@@ -1,0 +1,32 @@
+id: local.docker_compose.fix_yaml_004
+family: docker_compose
+prompt: |
+  Add missing restart policy and resource limits to this docker-compose.yml.
+
+  ```yaml
+  # {{context_files}}
+  ```
+
+  Produce a corrected version with the following additions:
+  1. Add `restart: unless-stopped` to all services
+  2. Add memory and CPU limits for the api service (512M memory, 0.5 cpus)
+  3. Add memory and CPU limits for the db service (1G memory, 1.0 cpus)
+  4. Add memory and CPU limits for the redis service (256M memory, 0.25 cpus)
+  5. Add a `deploy.resources` block with reservations matching limits
+  6. Add `restart: unless-stopped` to all three services
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "restart: unless-stopped"
+    - "memory"
+    - "cpus"
+    - "limits:"
+  absent_patterns:
+    - "no_restart"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

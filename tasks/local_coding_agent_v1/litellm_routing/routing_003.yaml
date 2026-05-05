@@ -1,0 +1,32 @@
+id: local.litellm_routing.routing_003
+family: litellm_routing
+prompt: |
+  Create a LiteLLM proxy config with rate limiting, fallback models, and health checks.
+
+  Produce a complete LiteLLM proxy configuration that includes:
+  1. Rate limiting: max_requests_per_minute of 100 for gpt-4, 500 for gpt-3.5-turbo
+  2. Fallback models: gpt-4 falling back to gpt-3.5-turbo, gpt-3.5-turbo falling back to local vllm
+  3. Health check configuration with healthcheck_interval of 60 seconds
+  4. API key management for multiple providers (OpenAI, Azure, local vllm)
+  5. Cache settings with cache_ttl of 3600 seconds
+  6. Logging configuration with log_level set to INFO
+
+  The config should be production-ready with all security best practices applied.
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "rate_limit"
+    - "fallback"
+    - "healthcheck"
+    - "cache"
+    - "api_key"
+    - "log_level"
+  absent_patterns:
+    - "test_key"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

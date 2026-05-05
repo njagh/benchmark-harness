@@ -1,0 +1,32 @@
+id: local.docker_compose.fix_yaml_005
+family: docker_compose
+prompt: |
+  Fix the environment variable substitution in this docker-compose.yml — vars are not being resolved.
+
+  ```yaml
+  # {{context_files}}
+  ```
+
+  Produce a corrected version with the following fixes:
+  1. Variables like `${DB_HOST}` are not defined in the compose file — add an `x-env` section or external env_file
+  2. Add an `.env` file content snippet that defines all required variables
+  3. Add `env_file` references to services that need them
+  4. Ensure the redis service uses `${REDIS_PORT}` consistently (6379)
+  5. Add a note about which variables need to be exported vs. defaults
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "env_file"
+    - ".env"
+    - "DB_HOST"
+    - "DB_PASSWORD"
+    - "REDIS_PORT"
+  absent_patterns:
+    - "undefined"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

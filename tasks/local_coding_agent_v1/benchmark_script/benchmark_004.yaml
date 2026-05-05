@@ -1,0 +1,44 @@
+id: local.benchmark_script.benchmark_004
+family: benchmark_script
+prompt: |
+  Add parallel execution support to this benchmark script — run multiple tasks concurrently.
+
+  ```python
+  def run_benchmark(tasks, api_endpoint):
+      results = []
+      for task in tasks:
+          response = call_api(api_endpoint, task["prompt"])
+          score = evaluate(response, task["expected"])
+          results.append({
+              "task_id": task["id"],
+              "score": score,
+              "status": "success"
+          })
+      return results
+  ```
+
+  Produce a corrected version with:
+  1. Add `import asyncio` and `from concurrent.futures import ThreadPoolExecutor`
+  2. Convert the loop to use asyncio.gather() for async execution with max 10 concurrent tasks
+  3. Add a Semaphore of size 10 to limit concurrency
+  4. Use ThreadPoolExecutor with max_workers=10 as an alternative synchronous approach
+  5. Add a progress tracker that shows completed/total as tasks finish
+  6. Handle task failures gracefully — collect errors but continue processing remaining tasks
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "asyncio"
+    - "concurrent"
+    - "ThreadPoolExecutor"
+    - "Semaphore"
+    - "gather"
+    - "max_workers"
+  absent_patterns:
+    - "TODO"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

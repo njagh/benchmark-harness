@@ -35,7 +35,8 @@ def _migrate_legacy_task(data: dict[str, Any], task_path: str) -> dict[str, Any]
     """
     task_id = data.get("id", Path(task_path).stem)
 
-    # Derive family from ID prefix if available
+    # Derive family from ID prefix if available.
+    # For legacy tasks, ignore any 'family' in YAML and derive from ID.
     family = "unknown"
     if "." in task_id:
         parts = task_id.split(".")
@@ -163,6 +164,10 @@ def _load_tasks_impl(task_dir: str, as_objects: bool) -> list[Task] | list[dict[
 
     results: list[Task] | list[dict[str, Any]] = []
     yaml_files = sorted(task_path.glob("*.yaml")) + sorted(task_path.glob("*.yml"))
+    # Also recurse into subdirectories (e.g., tasks/local_coding_agent_v1/docker_compose/)
+    yaml_files += sorted(task_path.glob("**/*.yaml")) + sorted(task_path.glob("**/*.yml"))
+    # Deduplicate (files matching *.yaml also match **/*.yaml)
+    yaml_files = sorted(set(yaml_files), key=lambda p: str(p))
 
     if not yaml_files:
         logger.warning("No .yaml/.yml files found in %s", task_path)
@@ -171,6 +176,12 @@ def _load_tasks_impl(task_dir: str, as_objects: bool) -> list[Task] | list[dict[
     load_fn = load_task_object if as_objects else load_task
 
     for yf in yaml_files:
+        # Skip context/fixture files (e.g., fix_yaml_001_context.yml)
+        if "_context" in yf.stem.lower():
+            continue
+        # Skip test files in subdirectories (e.g., tests/*.py loaded as yaml by mistake)
+        if "tests" in yf.parts or "fixtures" in yf.parts:
+            continue
         try:
             task = load_fn(str(yf))
             results.append(task)

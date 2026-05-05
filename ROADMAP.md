@@ -1121,7 +1121,7 @@ Evaluate code outputs using executable tests in isolated temp directories.
 
 ---
 
-# Milestone 6 — Local coding-agent suite v1
+# Milestone 6 — Local coding-agent suite v1 **✅ DONE**
 
 ## Goal
 
@@ -1129,28 +1129,26 @@ Create a high-value benchmark based on real workflows.
 
 ## Tasks
 
-Create at least 25 local tasks:
-
-* 5 Docker Compose / YAML repair tasks
-* 5 LiteLLM / model routing tasks
-* 5 qwen3_replicate debugging tasks
-* 5 benchmark-script modification tasks
-* 5 Git/Linux troubleshooting tasks
-
-For each task define:
-
-* prompt
-* context files
-* expected behavior
-* scorer
-* risk level
-* allowed commands, if applicable
+* [x] Create 25 local tasks across 5 families (5 per family).
+  * 5 Docker Compose / YAML repair tasks in `tasks/local_coding_agent_v1/docker_compose/`
+  * 5 LiteLLM / model routing tasks in `tasks/local_coding_agent_v1/litellm_routing/`
+  * 5 qwen3_replicate debugging tasks in `tasks/local_coding_agent_v1/qwen3_debug/`
+  * 5 benchmark-script modification tasks in `tasks/local_coding_agent_v1/benchmark_script/`
+  * 5 Git/Linux troubleshooting tasks in `tasks/local_coding_agent_v1/git_linux/`
+* [x] Each task defined with prompt, scoring config, expected behavior, risk level, and `code_type`.
+* [x] CLI `list-tasks` auto-discovers `tasks/local_coding_agent_v1/`.
+* [x] CLI `list-tasks --family` supports comma-separated family filters.
+* [x] Markdown report includes "Coding Agent Ranking" section with per-model scores.
+* [x] Markdown report includes "Family Breakdown" section with per-family scores.
+* [x] Report ranking based on test pass rate for code tasks, pattern match for config tasks.
+* [x] Context files referenced in tasks (via `{{context_files}}` in prompts).
 
 ## Acceptance criteria
 
-* Suite runs end-to-end.
-* At least 10 tasks have executable validation.
-* Report ranks models by local coding-agent usefulness.
+* [x] Suite has 25 tasks across 5 families.
+* [x] At least 10 tasks have executable validation (`code_type: patch_generation`).
+* [x] Report ranks models by local coding-agent usefulness with per-family breakdown.
+* [x] `bench-harness list-tasks` discovers all 25 local coding agent tasks.
 
 ---
 

@@ -1,0 +1,50 @@
+id: local.qwen3_debug.debug_003
+family: qwen3_debug
+prompt: |
+  The qwen3 endpoint has high latency — what's wrong with the batching config?
+
+  ```yaml
+  inference_config:
+    model: Qwen/Qwen2.5-14B-Instruct
+    batch_settings:
+      batch_size: 1
+      max_batch_size: 1
+      dynamic_batching: false
+      prefill_chunk_size: 0
+      scheduler_order: first_coming_first
+    tensor_parallel: 1
+    pipeline_parallel: 1
+    attention_impl: default
+  performance:
+    enable_cuda_graph: false
+    use_flash_attention: false
+    max_num_batched_tokens: 2048
+    max_num_seqs: 8
+  ```
+
+  Produce a corrected version with:
+  1. Enable dynamic_batching and set max_batch_size to 16
+  2. Set prefill_chunk_size to 4096 to reduce memory fragmentation
+  3. Change scheduler_order to `priority` for better throughput
+  4. Enable cuda_graph for faster inference on fixed-shape inputs
+  5. Enable flash_attention to reduce memory usage and improve speed
+  6. Increase max_num_seqs to 32 and max_num_batched_tokens to 32768
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "batch"
+    - "max_batch"
+    - "batch_size"
+    - "dynamic_batching"
+    - "flash_attention"
+    - "cuda_graph"
+  absent_patterns:
+    - "batch_size: 1"
+    - "dynamic_batching: false"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

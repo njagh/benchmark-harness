@@ -1,0 +1,49 @@
+id: local.git_linux.linux_003
+family: git_linux
+prompt: |
+  Fix this bash script that monitors disk usage — it doesn't handle spaces in paths and the alert threshold is wrong.
+
+  ```bash
+  #!/usr/bin/env bash
+
+  THRESHOLD=99
+  ALERT_EMAIL=admin@example.com
+
+  check_disk() {
+      for dir in $(find /data -type d); do
+          usage=$(du -sh "$dir" | awk '{print $1}')
+          if [ "$usage" -gt "$THRESHOLD" ]; then
+              echo "ALERT: $dir usage is $usage" | mail -s "Disk Alert" $ALERT_EMAIL
+          fi
+      done
+  }
+
+  check_disk
+  ```
+
+  Produce a corrected version with:
+  1. Fix the `find` loop to handle spaces in paths — use `find ... -print0` with `while read -d ''`
+  2. Fix the threshold: change from `99` to `80` (80% usage alert)
+  3. Fix the comparison to use percentage-based disk usage instead of du output
+  4. Use `df` command with percentage parsing: `df --output=pcent | tail`
+  5. Add a `threshold` variable at the top clearly documented
+  6. Add a check for filesystem type to skip tmpfs and NFS mounts
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "threshold"
+    - "quota"
+    - "du "
+    - "print0"
+    - "df"
+    - "pcent"
+  absent_patterns:
+    - "THRESHOLD=99"
+    - "find /data -type d"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

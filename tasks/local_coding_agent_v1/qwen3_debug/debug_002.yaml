@@ -1,0 +1,45 @@
+id: local.qwen3_debug.debug_002
+family: qwen3_debug
+prompt: |
+  The qwen3 API returns 503 errors for requests longer than 2000 tokens. Fix the max sequence length config.
+
+  ```yaml
+  api_config:
+    host: 0.0.0.0
+    port: 8080
+    max_concurrent_requests: 16
+  model_config:
+    model: Qwen/Qwen2.5-7B-Instruct
+    max_seq_length: 2048
+    context_length: 2048
+    max_input_tokens: 2048
+    max_completion_tokens: 512
+  serving:
+    disable_fastapi_docs: true
+    worker_timeout_seconds: 600
+  ```
+
+  Produce a corrected version with:
+  1. Increase max_seq_length to at least 8192 to support longer inputs
+  2. Increase context_length to match the new max_seq_length
+  3. Increase max_input_tokens to 7168 to leave room for completion tokens
+  4. Increase max_completion_tokens to 2048 for useful output lengths
+  5. Add a sliding window or attention optimization config for long contexts
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "max_seq"
+    - "max_length"
+    - "context_length"
+    - "max_input_tokens"
+    - "max_completion_tokens"
+  absent_patterns:
+    - "max_seq_length: 2048"
+    - "context_length: 2048"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

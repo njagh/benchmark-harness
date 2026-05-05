@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - /wrong/path/data:/var/lib/postgresql/data
+      - ./backups:/var/lib/postgresql/data/backups
+    networks:
+      - backend-net
+
+  cache:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    networks:
+      app-network:
+        ipv4_address: 172.28.0.5
+
+  web:
+    build: .
+    networks:
+      - backend-net
+      - app-network
+
+volumes:
+  redis-data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: rw
+
+networks:
+  backend-net:
+    driver: bridge
+  app-network:
+    driver: host

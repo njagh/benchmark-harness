@@ -1,0 +1,45 @@
+id: local.benchmark_script.benchmark_005
+family: benchmark_script
+prompt: |
+  Fix the scoring aggregation in this benchmark script — it averages all scores but should weight by task family.
+
+  ```python
+  def aggregate_scores(results):
+      total_score = sum(r["score"] for r in results)
+      avg_score = total_score / len(results)
+
+      # Simple pass rate
+      passed = sum(1 for r in results if r["score"] >= 0.8)
+      pass_rate = passed / len(results)
+
+      return {
+          "average_score": avg_score,
+          "pass_rate": pass_rate,
+          "total_tasks": len(results)
+      }
+  ```
+
+  Produce a corrected version with:
+  1. Add task family weights: coding=0.4, debugging=0.3, shell=0.2, general=0.1
+  2. Group results by task family using `r.get("family", "general")`
+  3. Calculate weighted average: sum(score * weight) / sum(weights) for each family
+  4. Calculate per-family average scores and pass rates
+  5. Add a summary dict with overall weighted score and per-family breakdown
+  6. Handle edge case where a family has zero tasks (exclude from weighted average)
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "weight"
+    - "family"
+    - "weighted"
+    - "coding"
+    - "debugging"
+  absent_patterns:
+    - "sum(r"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

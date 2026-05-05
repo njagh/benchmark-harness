@@ -1,0 +1,38 @@
+id: local.git_linux.linux_002
+family: git_linux
+prompt: |
+  Create a log rotation config for a high-traffic web service that rotates daily and keeps 30 days.
+
+  ```
+  # Log rotation config placeholder
+  /var/log/webapp/*.log {
+      # TODO: Add rotation settings
+  }
+  ```
+
+  Produce a complete logrotate configuration with:
+  1. Rotate daily with `daily` directive
+  2. Keep 30 days of logs with `rotate 30`
+  3. Compress rotated logs with `compress` and `delaycompress` (don't compress yesterday's log)
+  4. Add `missingok` to skip errors if log file is missing
+  5. Add `notifempty` to skip rotation of empty log files
+  6. Add a postrotate script that sends `USR1` signal to the web server for log reopening
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "daily"
+    - "rotate 30"
+    - "compress"
+    - "delaycompress"
+    - "missingok"
+    - "notifempty"
+    - "postrotate"
+  absent_patterns:
+    - "TODO"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

@@ -1,0 +1,46 @@
+id: local.benchmark_script.benchmark_003
+family: benchmark_script
+prompt: |
+  Fix the token counting in this benchmark script — it counts prompt and completion tokens but misses total_tokens.
+
+  ```python
+  def count_tokens(response):
+      prompt_tokens = len(response["usage"]["prompt_tokens"])
+      completion_tokens = len(response["usage"]["completion_tokens"])
+      return {
+          "prompt_tokens": len(prompt_tokens),
+          "completion_tokens": len(completion_tokens)
+      }
+
+  def run_benchmark_task(task, api_response):
+      tokens = count_tokens(api_response)
+      return {
+          "task_id": task["id"],
+          "tokens_used": tokens["prompt_tokens"] + tokens["completion_tokens"],
+          "status": "success"
+      }
+  ```
+
+  Produce a corrected version with:
+  1. Fix token counting to read actual values: `response["usage"]["prompt_tokens"]` not `len()` of the value
+  2. Add `total_tokens` field from `response["usage"]["total_tokens"]`
+  3. Fallback to `prompt_tokens + completion_tokens` when `total_tokens` is not provided by the API
+  4. Add validation that token counts are non-negative integers
+  5. Add a cumulative token counter that tracks total tokens across all tasks
+  6. Return a complete token summary: prompt_tokens, completion_tokens, total_tokens
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "total_tokens"
+    - "prompt_tokens"
+    - "completion_tokens"
+    - "usage"
+  absent_patterns:
+    - "len(response"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

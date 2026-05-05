@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_HOST=${DB_HOST}
+      - DATABASE_PORT=${DB_PORT}
+      - CACHE_HOST=${REDIS_HOST}
+      - CACHE_PORT=${REDIS_PORT}
+      - LOG_LEVEL=${LOG_LEVEL}
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      - REDIS_PORT=${REDIS_PORT}
+
+networks:
+  app-net:
+    driver: bridge

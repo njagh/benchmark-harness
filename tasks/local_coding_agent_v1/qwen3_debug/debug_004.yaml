@@ -1,0 +1,53 @@
+id: local.qwen3_debug.debug_004
+family: qwen3_debug
+prompt: |
+  Fix the quantization config for qwen3 — it's using INT4 but the config says INT8.
+
+  ```yaml
+  quantization_config:
+    model: Qwen/Qwen2.5-7B-Instruct
+    quantization_type: int8
+    bits: 8
+    target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    disable_exllama: false
+    exllama_config:
+      max_input_len: 2048
+      max_batch_size: 4
+  deployment:
+    gpu_utilization: 0.9
+    load_in_8bit: true
+    load_in_4bit: false
+  ```
+
+  Produce a corrected version with:
+  1. Change quantization_type from `int8` to `int4` to match the actual deployment
+  2. Change `bits` from `8` to `4`
+  3. Enable `load_in_4bit: true` and set `load_in_8bit: false`
+  4. Enable exllama for INT4 with proper config (disable exllama kernel for INT4)
+  5. Add bnb_config with 4-bit precision settings
+  6. Update target_modules to match quantization-aware training
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "quantization"
+    - "int4"
+    - "bits: 4"
+    - "load_in_4bit"
+  absent_patterns:
+    - "quantization_type: int8"
+    - "bits: 8"
+    - "load_in_4bit: false"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

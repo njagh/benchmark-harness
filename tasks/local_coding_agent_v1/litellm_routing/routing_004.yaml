@@ -1,0 +1,54 @@
+id: local.litellm_routing.routing_004
+family: litellm_routing
+prompt: |
+  Fix the LiteLLM router — the load balancing strategy is invalid and the model weights are wrong.
+
+  ```yaml
+  model_list:
+    - model_name: model-a
+      litellm_params:
+        model: openai/gpt-4
+        model_info:
+          base_model: gpt-4
+
+    - model_name: model-b
+      litellm_params:
+        model: openai/gpt-3.5-turbo
+        model_info:
+          base_model: gpt-3.5
+
+    - model_name: model-c
+      litellm_params:
+        model: openai/gpt-4
+        model_info:
+          base_model: gpt-4
+
+  litellm_settings:
+    load_balance: round_robin
+    weight: [5, 5, 5]
+    pass_through_endpoints: []
+  ```
+
+  Produce a corrected version with:
+  1. Fix load balancing — use valid strategy names (random, round_robin, weighted, fallback)
+  2. Fix weights so they sum to 100 or use relative weights correctly
+  3. model-a and model-c both map to gpt-4 but should have different aliases or be deduplicated
+  4. Add max_retries and timeout settings
+  5. Add a pass_through_endpoints list for direct API forwarding
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "load_balancing"
+    - "weight"
+    - "round_robin"
+    - "max_retries"
+    - "timeout"
+  absent_patterns:
+    - "weight: [5, 5, 5]"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

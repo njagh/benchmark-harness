@@ -189,7 +189,7 @@ def run(
 
 @app.command()
 def list_tasks(
-    family: str | None = typer.Option(None, "--family", help="Filter by task family"),
+    family: str | None = typer.Option(None, "--family", help="Filter by task family, comma-separated"),
     source: str | None = typer.Option(None, "--source", help="Filter by task source"),
 ):
     """List all registered tasks, optionally filtered by family or source."""
@@ -201,7 +201,7 @@ def list_tasks(
 
     # Check for known task directories
     root = Path(__file__).resolve().parent.parent.parent
-    for td in ("tasks/smoke", "tasks/coding_smoke"):
+    for td in ("tasks/smoke", "tasks/coding_smoke", "tasks/local_coding_agent_v1"):
         td_path = root / td
         if td_path.exists():
             task_dirs.append(str(td_path))
@@ -220,7 +220,8 @@ def list_tasks(
     tasks = registry.list_all()
 
     if family:
-        tasks = [t for t in tasks if t.family == family]
+        family_filter = [f.strip() for f in family.split(",")]
+        tasks = [t for t in tasks if t.family in family_filter]
     if source:
         tasks = [t for t in tasks if t.source == source]
 
@@ -260,7 +261,7 @@ def show_task(
     registry = TaskRegistry()
 
     root = Path(__file__).resolve().parent.parent.parent
-    for td in ("tasks/smoke", "tasks/coding_smoke"):
+    for td in ("tasks/smoke", "tasks/coding_smoke", "tasks/local_coding_agent_v1"):
         td_path = root / td
         if td_path.exists():
             registry.load_from_directory(str(td_path))

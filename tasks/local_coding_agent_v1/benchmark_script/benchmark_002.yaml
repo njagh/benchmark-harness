@@ -1,0 +1,47 @@
+id: local.benchmark_script.benchmark_002
+family: benchmark_script
+prompt: |
+  Add CSV export functionality to this benchmark script — it should output results to results.csv.
+
+  ```python
+  import json
+
+  def run_benchmark(tasks, api_endpoint):
+      results = []
+      for task in tasks:
+          # ... API call and result collection ...
+          results.append({
+              "task_id": task["id"],
+              "model": task.get("model", "default"),
+              "score": task.get("score", 0),
+              "tokens": task.get("total_tokens", 0),
+              "status": task.get("status", "success")
+          })
+      return results
+  ```
+
+  Produce a corrected version with:
+  1. Add `import csv` for CSV writing
+  2. Add a function `export_results_csv(results, output_path="results.csv")` that writes results to CSV
+  3. The CSV should have headers: task_id, model, score, tokens, status, timestamp
+  4. Add `import datetime` to include a timestamp column
+  5. Use pandas `DataFrame.to_csv()` as an alternative export method with a `--csv` flag check
+  6. Add a summary row at the end with total tasks, average score, and pass rate
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "csv"
+    - "export"
+    - "results.csv"
+    - "pandas"
+    - "DataFrame"
+    - "to_csv"
+  absent_patterns:
+    - "TODO"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

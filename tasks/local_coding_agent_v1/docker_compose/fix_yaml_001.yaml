@@ -1,0 +1,32 @@
+id: local.docker_compose.fix_yaml_001
+family: docker_compose
+prompt: |
+  Fix this docker-compose.yml — the redis service has an invalid port mapping and the web service can't connect to redis.
+
+  ```yaml
+  # {{context_files}}
+  ```
+
+  Produce a corrected version with the following fixes:
+  1. Port 99999 is invalid (must be 1-65535) — use the standard Redis port 6379
+  2. The web service connects to "redis-server" but the worker uses a different reference — standardize on "redis"
+  3. Add a healthcheck for the redis service
+  4. Ensure all services are on the same default network
+  5. Add restart policies to all services
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "ports:"
+    - "6379"
+    - "redis"
+    - "restart:"
+    - "healthcheck:"
+  absent_patterns:
+    - "99999"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

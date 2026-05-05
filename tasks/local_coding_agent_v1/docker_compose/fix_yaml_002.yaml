@@ -1,0 +1,32 @@
+id: local.docker_compose.fix_yaml_002
+family: docker_compose
+prompt: |
+  Fix this docker-compose.yml — volumes are not mounted correctly and the network alias is wrong.
+
+  ```yaml
+  # {{context_files}}
+  ```
+
+  Produce a corrected version with the following fixes:
+  1. The postgres volume mount uses `/wrong/path/data` — use a named volume or relative path `./pgdata:/var/lib/postgresql/data`
+  2. The cache service network `app-network` uses `ipv4_address` but the service is on the wrong network for that subnet
+  3. The `app-network` uses `host` driver which doesn't support custom subnets
+  4. Standardize networking: put all services on a single `app-net` bridge network
+  5. The backups volume path `./backups` should be a named volume
+scoring:
+  primary: contains
+  secondary: [format_compliance]
+expected:
+  type: contains
+  patterns:
+    - "networks:"
+    - "bridge"
+    - "pgdata"
+    - "volumes:"
+  absent_patterns:
+    - "/wrong/path"
+    - "host"
+  format_checks:
+    - type: numbered_list
+risk_level: low
+code_type: patch_generation

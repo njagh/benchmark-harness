@@ -218,6 +218,9 @@ def generate_report(
             lines.append(f"---")
             lines.append(f"")
 
+    # Coding Agent Ranking (when code_type is present in runs)
+    _append_coding_agent_ranking(lines, runs)
+
     # Write to file
     output_path = Path(out_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -225,6 +228,184 @@ def generate_report(
 
     report_str = "\n".join(lines)
     return report_str
+
+
+def _group_by_family(runs: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Group runs by task family.
+
+    Args:
+        runs: List of run result dicts.
+
+    Returns:
+        Dict mapping family name to list of runs for that family.
+    """
+    by_family: dict[str, list[dict[str, Any]]] = {}
+    for run in runs:
+        task_id = run.get("task_id", "unknown")
+        # Extract family from task_id: "local.docker_compose.fix_yaml_001" -> "docker_compose"
+        family = _extract_family_from_task_id(task_id)
+        if family is None:
+            family = "other"
+        if family not in by_family:
+            by_family[family] = []
+        by_family[family].append(run)
+    return by_family
+
+
+def _extract_family_from_task_id(task_id: str) -> str | None:
+    """Extract the sub-family from a task ID.
+
+    For task IDs like "local.docker_compose.fix_yaml_001", returns "docker_compose".
+    For task IDs without a clear family component, returns None.
+
+    Args:
+        task_id: The task identifier string.
+
+    Returns:
+        The family sub-component or None.
+    """
+    # Handle dot-separated task IDs
+    parts = task_id.split(".")
+    if len(parts) >= 3:
+        # local.docker_compose.fix_yaml_001 -> docker_compose
+        # local.litellm_routing.routing_001 -> litellm_routing
+        # local.qwen3_debug.debug_001 -> qwen3_debug
+        candidate = parts[1]
+        skip = {"smoke", "local", "public", "synthetic"}
+        if candidate.lower() not in skip:
+            return candidate
+    # smoke.factual_001: "smoke" is prefix, factual_001 is name (not a family)
+    if len(parts) >= 2:
+        candidate = parts[1]
+        skip = {"factual", "json", "python", "debug", "instruction"}
+        if candidate.lower() not in skip:
+            # Only return if it doesn't look like a task name with underscore
+            if "_" not in candidate or len(parts) < 3:
+                return candidate
+    # Handle underscore-based task IDs for public benchmarks
+    parts = task_id.split("_")
+    if len(parts) >= 2:
+        candidate = parts[1]
+        skip = {"factual", "json", "python", "debug", "code", "instruction"}
+        if candidate.lower() not in skip:
+            return candidate
+    return None
+
+
+def _append_coding_agent_ranking(lines: list[str], runs: list[dict[str, Any]]) -> None:
+    """Append Coding Agent Ranking and Family Breakdown sections if code tasks exist.
+
+    Args:
+        lines: List of markdown line strings to append to.
+        runs: List of run result dicts.
+    """
+    # Check if any run has a code_type (indicating code tasks were run)
+    code_runs = [r for r in runs if r.get("code_type") is not None]
+    if not code_runs:
+        return
+
+    scored_runs = [r for r in code_runs if r.get("score_primary") is not None]
+    if not scored_runs:
+        return
+
+    # Group by model
+    model_stats: dict[str, list[dict]] = {}
+    for run in scored_runs:
+        alias = run.get("model_alias", "unknown")
+        if alias not in model_stats:
+            model_stats[alias] = []
+        model_stats[alias].append(run)
+
+    # Build ranking
+    rankings = []
+    for alias, model_runs in sorted(model_stats.items()):
+        total_tasks = len(model_runs)
+        avg_score = sum(
+            r.get("score_primary", 0) or 0 for r in model_runs
+        ) / max(total_tasks, 1)
+        # Count successfully executable outputs (tests_passed > 0 or code_status is success)
+        executable_success = sum(
+            1
+            for r in model_runs
+            if r.get("tests_passed", 0) and r.get("tests_passed", 0) > 0
+            or r.get("code_status") == "success"
+        )
+
+        # Best and worst family
+        family_scores: dict[str, list[float]] = {}
+        for r in model_runs:
+            family = _extract_family_from_task_id(r.get("task_id", ""))
+            if family is None:
+                family = "other"
+            score = r.get("score_primary", 0) or 0
+            if family not in family_scores:
+                family_scores[family] = []
+            family_scores[family].append(score)
+
+        best_family = ""
+        worst_family = ""
+        best_avg = -1
+        worst_avg = 2
+        for fam, scores in sorted(family_scores.items()):
+            fam_avg = sum(scores) / max(len(scores), 1)
+            if fam_avg > best_avg:
+                best_avg = fam_avg
+                best_family = fam
+            if fam_avg < worst_avg:
+                worst_avg = fam_avg
+                worst_family = fam
+
+        rankings.append(
+            {
+                "alias": alias,
+                "total_tasks": total_tasks,
+                "avg_score": avg_score,
+                "executable_success": executable_success,
+                "best_family": best_family,
+                "worst_family": worst_family,
+                "family_scores": family_scores,
+            }
+        )
+
+    # Sort by avg score descending
+    rankings.sort(key=lambda x: x["avg_score"], reverse=True)
+
+    # Coding Agent Ranking table
+    lines.append(f"## Coding Agent Ranking")
+    lines.append(f"")
+    lines.append(f"| Rank | Model | Tasks | Avg Score | Best Family | Worst Family |")
+    lines.append(f"|---|---|---|---|---|---|")
+
+    for rank, info in enumerate(rankings, 1):
+        lines.append(
+            f"| {rank} | {info['alias']} | {info['total_tasks']} "
+            f"| {info['avg_score']:.3f} | {info['best_family']} | {info['worst_family']} |"
+        )
+
+    lines.append(f"")
+
+    # Per-Family Breakdown
+    lines.append(f"## Family Breakdown")
+    lines.append(f"")
+    lines.append(f"| Family | Tasks | Avg Score | Passed | Failed |")
+    lines.append(f"|---|---|---|---|---|")
+
+    family_data = _group_by_family(scored_runs)
+    for family, family_runs in sorted(family_data.items()):
+        total = len(family_runs)
+        passed = sum(
+            1 for r in family_runs
+            if r.get("tests_passed", 0) and r.get("tests_passed", 0) > 0
+            or r.get("exit_status") == "success"
+            or (r.get("score_primary", 0) or 0) >= 0.5
+        )
+        failed = total - passed
+        avg_score = sum(r.get("score_primary", 0) or 0 for r in family_runs) / max(total, 1)
+        lines.append(
+            f"| {family} | {total} | {avg_score:.3f} | {passed} | {failed} |"
+        )
+
+    lines.append(f"")
 
 
 def print_summary(runs: list[dict[str, Any]], suite_id: str) -> None:
