@@ -20,6 +20,7 @@ from bench_harness.config import (
 )
 from bench_harness.models.openai_client import OpenAICompatClient
 from bench_harness.runners.completion_runner import CompletionRunner
+from bench_harness.runners.style_sweep_runner import StyleSweepRunner
 from bench_harness.tasks.loaders import load_tasks
 from bench_harness.tasks.registry import TaskRegistry
 from bench_harness.storage.sqlite import SQLiteStore
@@ -45,6 +46,7 @@ def run(
     temperature: float = typer.Option(0.0, "--temperature", help="Sampling temperature"),
     max_tokens: int = typer.Option(4096, "--max-tokens", help="Max output tokens"),
     runs: int = typer.Option(1, "--runs", help="Number of repetitions per task"),
+    styles: str = typer.Option("plain", "--styles", help="Comma-separated list of prompt styles (default: plain)"),
     out: str | None = typer.Option(None, "--out", help="Output directory"),
     timing_detail: bool = typer.Option(False, "--timing-detail", help="Show per-task timing in CLI output"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print tasks without executing"),
@@ -111,6 +113,7 @@ def run(
     store.init()
 
     # Run
+    style_list = [s.strip() for s in styles.split(",")]
     all_results = []
 
     for alias in model_aliases:
@@ -141,42 +144,111 @@ def run(
                     f"  [dim]{task.get('id')} (run {run_num}/{runs})[/dim]"
                 )
 
-                result = asyncio.run(runner.run(task, params, suite_id=suite_id))
-                all_results.append(result)
-
-                # Save to SQLite
-                store.save_run(result)
-
-                # Save JSONL artifact
-                save_run_artifact(result, str(out_path))
-
-                if result.exit_status == "error":
-                    console.print(
-                        f"  [red]  Error:[/red] {result.error_message}"
+                if len(style_list) > 1:
+                    # Multi-style sweep
+                    style_params = {
+                        "model_alias": alias,
+                        "model_backend": backend,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                    }
+                    sweep = StyleSweepRunner(runner, styles=style_list)
+                    sweep_results = asyncio.run(
+                        sweep.run_sweep([task], [alias], style_params, suite_id=suite_id)
                     )
+                    for result in sweep_results:
+                        all_results.append(result)
+                        store.save_run(result)
+                        save_run_artifact(result, str(out_path))
+
+                        if result.exit_status == "error":
+                            console.print(
+                                f"  [red]  [{result.prompt_style}] Error:[/red] {result.error_message}"
+                            )
+                        else:
+                            if timing_detail:
+                                tps_str = (
+                                    f"{result.tokens_per_second:.1f}"
+                                    if result.tokens_per_second > 0
+                                    else "N/A"
+                                )
+                                console.print(
+                                    f"  [green]  [{result.prompt_style}] TTFT: {result.ttft_ms:.0f}ms[/green] "
+                                    f"[green]Decode: {result.decode_ms:.0f}ms[/green] "
+                                    f"[green]Wall: {result.total_wall_ms:.0f}ms[/green] "
+                                    f"[dim]{result.prompt_tokens}p + {result.completion_tokens}c tokens[/dim] "
+                                    f"[dim]{tps_str} tok/s[/dim]"
+                                )
+                            else:
+                                console.print(
+                                    f"  [green]  [{result.prompt_style}] Wall: {result.total_wall_ms:.0f}ms[/green] "
+                                    f"[dim]{result.total_tokens} tokens[/dim]"
+                                )
                 else:
-                    if timing_detail:
-                        tps_str = (
-                            f"{result.tokens_per_second:.1f}"
-                            if result.tokens_per_second > 0
-                            else "N/A"
-                        )
+                    # Single style (legacy path)
+                    result = asyncio.run(runner.run(task, params, suite_id=suite_id))
+                    all_results.append(result)
+
+                    # Save to SQLite
+                    store.save_run(result)
+
+                    # Save JSONL artifact
+                    save_run_artifact(result, str(out_path))
+
+                    if result.exit_status == "error":
                         console.print(
-                            f"  [green]  TTFT: {result.ttft_ms:.0f}ms[/green] "
-                            f"[green]Decode: {result.decode_ms:.0f}ms[/green] "
-                            f"[green]Wall: {result.total_wall_ms:.0f}ms[/green] "
-                            f"[dim]{result.prompt_tokens}p + {result.completion_tokens}c tokens[/dim] "
-                            f"[dim]{tps_str} tok/s[/dim]"
+                            f"  [red]  Error:[/red] {result.error_message}"
                         )
                     else:
-                        console.print(
-                            f"  [green]  Wall: {result.total_wall_ms:.0f}ms[/green] "
-                            f"[dim]{result.total_tokens} tokens[/dim]"
-                        )
+                        if timing_detail:
+                            tps_str = (
+                                f"{result.tokens_per_second:.1f}"
+                                if result.tokens_per_second > 0
+                                else "N/A"
+                            )
+                            console.print(
+                                f"  [green]  TTFT: {result.ttft_ms:.0f}ms[/green] "
+                                f"[green]Decode: {result.decode_ms:.0f}ms[/green] "
+                                f"[green]Wall: {result.total_wall_ms:.0f}ms[/green] "
+                                f"[dim]{result.prompt_tokens}p + {result.completion_tokens}c tokens[/dim] "
+                                f"[dim]{tps_str} tok/s[/dim]"
+                            )
+                        else:
+                            console.print(
+                                f"  [green]  Wall: {result.total_wall_ms:.0f}ms[/green] "
+                                f"[dim]{result.total_tokens} tokens[/dim]"
+                            )
 
     # Generate report
     runs_list = store.get_runs(suite_id=suite_id)
     report_md = generate_report(runs_list, suite_id, model_config, str(out_path / "report.md"))
+
+    # Print style comparison summary when multiple styles are used
+    if len(style_list) > 1:
+        console.print(f"\n[yellow]=== Style Comparison ({', '.join(style_list)}) ===[/yellow]")
+        # Group results by task_id and style
+        from collections import defaultdict
+        task_style_results: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+        for run in runs_list:
+            tid = run.get("task_id", "unknown")
+            ps = run.get("prompt_style", "plain")
+            task_style_results[tid][ps].append(run)
+
+        for tid in sorted(task_style_results.keys()):
+            styles_for_task = task_style_results[tid]
+            console.print(f"\n  [cyan]{tid}[/cyan]")
+            for style in style_list:
+                style_runs = styles_for_task.get(style, [])
+                if style_runs:
+                    avg_wall = sum(r.get("total_wall_ms", 0) for r in style_runs) / len(style_runs)
+                    avg_tokens = sum(r.get("total_tokens", 0) for r in style_runs) / len(style_runs)
+                    passed = sum(1 for r in style_runs if r.get("score_primary") and r["score_primary"] > 0)
+                    console.print(
+                        f"    [dim]{style}[/dim]: "
+                        f"wall={avg_wall:.0f}ms "
+                        f"tokens={avg_tokens:.0f} "
+                        f"passed={passed}/{len(style_runs)}"
+                    )
 
     # Print summary
     console.print(f"\n[yellow]=== Results ===[/yellow]")

@@ -4,7 +4,7 @@ Evaluates response quality, coding ability, instruction following, and performan
 
 ## Current Status
 
-**Phase:** Milestones M1–M7 complete. M8 (prompt style comparison) next.
+**Phase:** Milestones M1–M8 complete. M9 (long-context benchmark suite) next.
 
 The `ROADMAP.md` defines 15 milestones across 4 phases. Detailed execution plans with library integration notes are in `milestones/`. Virtual environment and core dependencies are set up.
 
@@ -41,7 +41,7 @@ pip install -e ".[long-context]"
 | 5 | Coding Task Runner | B — Coding usefulness | **Done** |
 | 6 | Local Coding-Agent Suite v1 | B — Coding usefulness | **Done** |
 | 7 | LLM Judge Integration | D — Data flywheel | **Done** |
-| 8 | Prompt Style Comparison | B — Coding usefulness | Not started |
+| 8 | Prompt Style Comparison | B — Coding usefulness | **Done** |
 | 9 | Long-Context Benchmark Suite | C — Deep comparison | Not started |
 | 10 | Quantization Comparison Suite | C — Deep comparison | Not started |
 | 11 | Agent Safety and Command Discipline | C — Deep comparison | Not started |

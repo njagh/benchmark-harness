@@ -1193,7 +1193,7 @@ Use judge scores for ranking only when exact or executable scoring is unavailabl
 
 ---
 
-# Milestone 8 — Prompt style comparison
+# Milestone 8 — Prompt style comparison **✅ DONE**
 
 ## Goal
 
@@ -1201,17 +1201,22 @@ Evaluate the impact of REPL mode and other prompting styles.
 
 ## Tasks
 
-* Add prompt template variants.
-* Add CLI support for prompt style sweep.
-* Run same tasks with multiple prompt styles.
-* Compare correctness, verbosity, latency, safety, and token use.
-* Add prompt-style report section.
+* [x] Add prompt template variants (7 built-in styles: plain, repl, terse, patch_only, architect, json_schema, step_by_step).
+* [x] Add CLI support for prompt style sweep (--styles flag, comma-separated).
+* [x] Implement StyleSweepRunner for task × style × model combinations.
+* [x] Run same tasks with multiple prompt styles and compare results.
+* [x] Compare correctness, verbosity, latency, safety, and token use.
+* [x] Add prompt-style report sections to Markdown report (6 sub-sections).
+* [x] Document REPL mode shown to help/fail scenarios.
 
 ## Acceptance criteria
 
-* Harness can show where REPL mode helps.
-* Harness can show where REPL mode adds unnecessary overhead.
-* Recommended prompt style is reported per task family.
+* [x] Harness can show where REPL mode helps (higher scores on debugging tasks).
+* [x] Harness can show where REPL mode adds unnecessary overhead (lower score/token ratio on simple tasks).
+* [x] Recommended prompt style is reported per task family.
+* [x] Style comparison report includes: summary, per-task breakdown, best-per-family, verbosity analysis, latency comparison, recommendation.
+* [x] RunResult supports prompt_style field for sweep results.
+* [x] Markdown report auto-detects and includes style comparison sections when prompt_style metadata is present.
 
 ---
 

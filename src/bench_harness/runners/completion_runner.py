@@ -106,6 +106,21 @@ class RunResult:
     human_override: bool | None = None
     human_score: float | None = None
     human_note: str | None = None
+    prompt_style: str | None = None  # The prompt style used for this run
+
+
+def build_messages(task: dict, prompt: str) -> list[dict]:
+    """Build OpenAI-compatible messages list from task and prompt.
+
+    Uses system message from task.input if available, otherwise
+    defaults to user-only messages.
+    """
+    messages = []
+    system_msg = task.get("input", {}).get("system_message")
+    if system_msg:
+        messages.append({"role": "system", "content": system_msg})
+    messages.append({"role": "user", "content": prompt})
+    return messages
 
 
 class CompletionRunner:
@@ -172,8 +187,8 @@ class CompletionRunner:
             )
 
         try:
-            # Build messages from prompt
-            messages = [{"role": "user", "content": prompt}]
+            # Build messages from prompt (using system message if present)
+            messages = build_messages(task, prompt)
 
             import time as _time
             api_start = _time.perf_counter()
@@ -305,6 +320,7 @@ class CompletionRunner:
                 validation_passed=validation_passed,
                 validation_command=validation_command,
                 validation_output=validation_output,
+                prompt_style=params.get("prompt_style"),
             )
 
         except Exception as e:
@@ -323,6 +339,7 @@ class CompletionRunner:
                 error_message=str(e),
                 total_wall_ms=total_wall_ms,
                 created_at=start_time.isoformat(),
+                prompt_style=params.get("prompt_style"),
             )
 
         return result
@@ -347,8 +364,8 @@ class CompletionRunner:
         import time as _time
 
         try:
-            # Step 1: Call the model to generate code
-            messages = [{"role": "user", "content": prompt}]
+            # Step 1: Call the model to generate code (using system message if present)
+            messages = build_messages(task, prompt)
             api_start = _time.perf_counter()
 
             response = await self.client.chat_complete(
@@ -468,6 +485,7 @@ class CompletionRunner:
                 exit_status="success" if code_result.get("exit_code", 0) == 0 else "error",
                 error_message=code_result.get("error_message"),
                 created_at=start_time.isoformat(),
+                prompt_style=params.get("prompt_style"),
             )
 
         except Exception as e:
@@ -486,6 +504,7 @@ class CompletionRunner:
                 error_message=str(e),
                 total_wall_ms=total_wall_ms,
                 created_at=start_time.isoformat(),
+                prompt_style=params.get("prompt_style"),
             )
 
         return result

@@ -53,6 +53,11 @@ class SQLiteStore:
         "human_note": "text",
     }
 
+    # M8 prompt style column
+    _RUNS_STYLE_COLUMNS = {
+        "prompt_style": "text",
+    }
+
     # M7 columns to add to score_details table
     _SCORE_DETAILS_EXTRA_COLUMNS = {
         "human_override": "int",
@@ -162,7 +167,16 @@ class SQLiteStore:
                     self.db["runs"].add_column(col, col_type)
                 except Exception as e:
                     logger.warning(
-                        "Failed to add column %s to runs table: %s", col, e
+                        "Failed to add column %s to runs table: %s", col, e,
+                    )
+        for col, col_type in self._RUNS_STYLE_COLUMNS.items():
+            if col not in existing:
+                logger.info("Migrating runs table: adding style column %s", col)
+                try:
+                    self.db["runs"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to runs table: %s", col, e,
                     )
 
     def _migrate_environments_schema(self) -> None:
@@ -338,6 +352,8 @@ class SQLiteStore:
                 "human_override": 1 if result.human_override else 0,
                 "human_score": result.human_score,
                 "human_note": result.human_note,
+                # M8 prompt style
+                "prompt_style": result.prompt_style,
             },
         )
 
@@ -412,6 +428,8 @@ class SQLiteStore:
                     "human_override": 1 if r.human_override else 0,
                     "human_score": r.human_score,
                     "human_note": r.human_note,
+                    # M8 prompt style
+                    "prompt_style": r.prompt_style,
                 }
             )
         self.db["runs"].insert_all(rows)

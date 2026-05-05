@@ -224,6 +224,9 @@ def generate_report(
     # M7 Judge sections
     _append_judge_sections(lines, runs, model_stats)
 
+    # M8 Style Comparison sections
+    _append_style_comparison(lines, runs)
+
     # Write to file
     output_path = Path(out_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -557,3 +560,32 @@ def print_summary(runs: list[dict[str, Any]], suite_id: str) -> None:
         )
 
     console.print(table)
+
+
+def _append_style_comparison(lines: list[str], runs: list[dict[str, Any]]) -> None:
+    """Append Style Comparison report sections if runs have prompt_style metadata.
+
+    Generates 6 sub-sections when prompt_style is detected in run data:
+    1. Style Comparison Summary
+    2. Per-Task Style Breakdown
+    3. Best Style Per Family
+    4. Verbosity Analysis
+    5. Latency Comparison
+    6. Recommended Style
+
+    Args:
+        lines: List of markdown line strings to append to.
+        runs: List of run result dicts.
+    """
+    style_runs = [r for r in runs if r.get("prompt_style") is not None]
+    if not style_runs:
+        return
+
+    # Delegate to the style comparison module for the full report
+    from bench_harness.reports.style_comparison import generate_style_report
+
+    report = generate_style_report(runs)
+    if report:
+        lines.append("")
+        lines.append(report)
+        lines.append("")

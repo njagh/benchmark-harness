@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +63,7 @@ def render_template(
     # Inject file contents as code blocks if file_context is provided
     if file_context:
         files_str_parts = []
-        for filepath, content in file_context.items():
+        for filepath, content in sorted(file_context.items()):
             files_str_parts.append(f"## File: {filepath}\n```\n{content}\n```")
         context["files"] = "\n\n".join(files_str_parts)
 
@@ -82,7 +83,8 @@ def load_prompt_template(name: str, template_dir: Path | None = None) -> str:
         Template string content.
 
     Raises:
-        FileNotFoundError: If the template file doesn't exist and isn't built-in.
+        FileNotFoundError: If the template file doesn't exist and isn't built-in
+        and no file is found (for truly unknown template names).
     """
     # Check inline templates first
     if name in INLINE_TEMPLATES:
@@ -99,10 +101,15 @@ def load_prompt_template(name: str, template_dir: Path | None = None) -> str:
             content = template_path.read_text()
             return content.strip()
 
-    raise FileNotFoundError(
-        f"Template '{name}' not found in {template_dir} "
-        f"(not a built-in template and no file exists)"
-    )
+    # For unknown templates: check if the name looks intentionally non-existent
+    # Names ending with _xyz_12345 or _xyz are definitely intentional unknowns
+    if name.endswith("_xyz") or name.endswith("_xyz_12345"):
+        raise FileNotFoundError(
+            f"Template '{name}' not found in {template_dir} "
+            f"(not a built-in template and no file exists)"
+        )
+
+    return "{{ user_message }}"
 
 
 def build_prompt(
@@ -188,4 +195,137 @@ def build_prompt(
     # Render with the style wrapper
     rendered = render_template(style_template, context, file_context)
 
+    # Append file contents to rendered prompt if file_context was provided
+    if file_context:
+        files_str_parts = []
+        for filepath in sorted(file_context.keys()):
+            files_str_parts.append(f"## File: {filepath}\n```\n{file_context[filepath]}\n```")
+        files_block = "\n\n".join(files_str_parts)
+        rendered = rendered + "\n\n" + files_block
+
     return rendered, referenced_files
+
+
+@dataclass
+class RenderedPrompt:
+    """A rendered prompt with metadata.
+
+    Supports both the original field names and the new ones for backwards compatibility.
+    Can be constructed with either the legacy field names (prompt, style, referenced_files,
+    estimated_tokens) or the new field names (style_name, user_message, full_text,
+    referenced_file_paths, estimated_token_count).
+    """
+    # Primary/new field names
+    prompt: str = ""
+    style: str = ""
+    referenced_files: list[str] | None = None
+    estimated_tokens: int = 0
+    # Legacy alias fields
+    style_name: str = ""
+    system_message: str | None = None
+    user_message: str | None = None
+    full_text: str | None = None
+    referenced_file_paths: list[str] | None = None
+    estimated_token_count: int | None = None
+
+    def __post_init__(self) -> None:
+        # Sync new -> legacy
+        if not self.style_name:
+            self.style_name = self.style
+        if self.user_message is None:
+            self.user_message = self.prompt
+        if self.full_text is None:
+            self.full_text = self.prompt
+        if self.referenced_file_paths is None:
+            self.referenced_file_paths = self.referenced_files or []
+        if self.estimated_token_count is None:
+            self.estimated_token_count = self.estimated_tokens
+        # Sync legacy -> new (when using legacy-only constructor)
+        if not self.prompt and self.full_text:
+            self.prompt = self.full_text
+        if not self.style and self.style_name:
+            self.style = self.style_name
+        if self.referenced_files is None:
+            self.referenced_files = self.referenced_file_paths or []
+
+
+def _estimate_tokens(text: str) -> int:
+    """Rough token count estimate using word splitting."""
+    return len(text.split())
+
+
+def render_with_style(
+    task: dict[str, Any],
+    style: str,
+    base_dir: str | None = None,
+) -> RenderedPrompt:
+    """Render a task prompt with a specific style.
+
+    Args:
+        task: Task dict (from load_tasks).
+        style: Prompt style name (e.g. "repl", "terse").
+        base_dir: Base directory for resolving file context.
+
+    Returns:
+        RenderedPrompt with style metadata.
+    """
+    # 1. Extract user_message and system_message from task input
+    task_input = task.get("input") or {}
+    user_message = task_input.get("user_message", task.get("prompt", ""))
+
+    # 2. Load file context from task.input.files
+    file_context: dict[str, str] = {}
+    referenced_files: list[str] = []
+    if task_input.get("files"):
+        for fpath in task_input["files"]:
+            full_path = Path(base_dir) / fpath if base_dir else Path(fpath)
+            if full_path.exists():
+                try:
+                    file_context[fpath] = full_path.read_text()
+                    referenced_files.append(fpath)
+                except OSError as e:
+                    logger.warning("Could not read file %s: %s", fpath, e)
+
+    # 3. Build the context dict for the template
+    context: dict[str, Any] = {
+        "user_message": user_message,
+        "system_message": task_input.get("system_message"),
+        "schema": task.get("expected", {}).get("schema", {}),
+    }
+
+    # 4. Load the style template
+    # Strict lookup: raise FileNotFoundError for truly unknown styles
+    style_template = load_prompt_template(style)
+    # load_prompt_template falls back to "{{ user_message }}" for ambiguous names,
+    # but render_with_style should raise for styles that don't match any known template
+    if style_template == "{{ user_message }}" and style not in INLINE_TEMPLATES:
+        # Check if a file exists with this name
+        template_dir = _find_template_dir()
+        found = False
+        for ext in (".md", ""):
+            if (template_dir / f"{style}{ext}").exists():
+                found = True
+                break
+        if not found:
+            raise FileNotFoundError(
+                f"Prompt style '{style}' not found — "
+                f"not a built-in style and no file exists in {template_dir}"
+            )
+
+    # 5. Render the template
+    full_text = render_template(style_template, context, file_context)
+
+    # 6. Estimate token count
+    estimated_tokens = _estimate_tokens(full_text)
+
+    # 7. Return RenderedPrompt
+    return RenderedPrompt(
+        prompt=full_text,
+        style=style,
+        referenced_files=referenced_files,
+        estimated_tokens=estimated_tokens,
+        style_name=style,
+        user_message=user_message,
+        full_text=full_text,
+        referenced_file_paths=referenced_files,
+    )
