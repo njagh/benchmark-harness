@@ -4,7 +4,7 @@ Evaluates response quality, coding ability, instruction following, and performan
 
 ## Current Status
 
-**Phase:** Planning complete. Dependencies installed. Implementation beginning.
+**Phase:** Milestone 1 complete (project bootstrap). M3 (timing/token metrics) next.
 
 The `ROADMAP.md` defines 15 milestones across 4 phases. Detailed execution plans with library integration notes are in `milestones/`. Virtual environment and core dependencies are set up.
 
@@ -34,7 +34,7 @@ pip install -e ".[long-context]"
 
 | # | Milestone | Phase | Status |
 |---|---|---|---|
-| 1 | Project Bootstrap | A — Minimal harness | Not started |
+| 1 | Project Bootstrap | A — Minimal harness | **Done** |
 | 2 | Task Schema and Registry | B — Coding usefulness | Not started |
 | 3 | Timing and Token Metrics | A — Minimal harness | Not started |
 | 4 | Basic Scorers | B — Coding usefulness | Not started |

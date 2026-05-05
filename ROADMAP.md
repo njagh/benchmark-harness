@@ -948,7 +948,7 @@ format_failure_rate
 
 ## 9. Implementation Milestones
 
-# Milestone 1 — Project bootstrap
+# Milestone 1 — Project bootstrap **✅ DONE**
 
 ## Goal
 
@@ -956,22 +956,22 @@ Create the repository, basic CLI, model config, and smoke runner.
 
 ## Tasks
 
-* Create repo structure.
-* Add `pyproject.toml`.
-* Add `configs/models.yaml`.
-* Implement OpenAI-compatible client.
-* Implement simple completion runner.
-* Implement JSONL output.
-* Implement SQLite output.
-* Add first five smoke tasks.
-* Add basic Markdown report.
+* [x] Create repo structure.
+* [x] Add `pyproject.toml`.
+* [x] Add `configs/models.yaml`.
+* [x] Implement OpenAI-compatible client.
+* [x] Implement simple completion runner.
+* [x] Implement JSONL output.
+* [x] Implement SQLite output.
+* [x] Add first five smoke tasks.
+* [x] Add basic Markdown report.
 
 ## Acceptance criteria
 
-* Can run one prompt against one local model.
-* Can run smoke suite against at least two models.
-* Stores raw response and timing data.
-* Produces a readable Markdown report.
+* [x] Can run one prompt against one local model.
+* [x] Can run smoke suite against at least two models.
+* [x] Stores raw response and timing data.
+* [x] Produces a readable Markdown report.
 
 ## Suggested first command target
 
@@ -981,35 +981,63 @@ python -m bench_harness run --suite smoke --models agent-code,qwen-dense
 
 ---
 
-# Milestone 2 — Task schema and registry
+# Milestone 2 — Task schema and registry **✅ DONE**
 
 ## Goal
 
-Make benchmark tasks structured, versioned, and easy to add.
+Make benchmark tasks structured, versioned, and easy to add without Python code changes.
 
 ## Tasks
 
-* Define task YAML schema.
-* Add task loader.
-* Add prompt template renderer.
-* Add task family/category metadata.
-* Add validation tests for malformed tasks.
-* Add stable task IDs.
-* Add task versioning.
+* [x] Define task YAML schema (Pydantic models: `Task`, `TaskInput`, `TaskExpected`, `TaskScoring`).
+* [x] Add task loader with schema validation and backward-compatible M1 migration.
+* [x] Add prompt template renderer (Jinja2-based, 7 built-in styles).
+* [x] Add task family/category metadata.
+* [x] Add validation tests for malformed tasks.
+* [x] Add stable task IDs with versioning support.
+* [x] Implement task registry (`TaskRegistry` with list/lookup by family/source).
+* [x] Add CLI subcommands: `list-tasks`, `show-task`.
 
 ## Acceptance criteria
 
-* New task can be added without Python code changes.
-* Invalid task configs fail fast with useful errors.
-* Task registry can list suites and tasks.
+* [x] New task can be added by dropping a YAML file into a task directory.
+* [x] Invalid task configs fail fast with field-level error messages.
+* [x] `bench-harness list-tasks` lists all registered tasks.
+* [x] `bench-harness list-tasks --family coding` filters correctly.
+* [x] `bench-harness show-task <id>` displays full task YAML.
+* [x] Prompt templates render correctly with context variables.
+* [x] Task versions are tracked and stored in run records.
 
 ---
 
-# Milestone 3 — Timing and token metrics
+# Milestone 3 — Timing and token metrics **✅ DONE**
 
 ## Goal
 
-Capture performance metrics comparable to existing timing benchmarks.
+Capture performance metrics (TTFT, wall time, decode time, token counts) comparable to existing timing benchmarks, stored consistently in SQLite and exposed in reports.
+
+## Tasks
+
+* [x] Implement wall-clock timing layer (`TimingRecord`, `timed_block`, `StreamingTimer`, `StreamMetrics`).
+* [x] Implement streaming TTFT capture (`StreamingTimer`).
+* [x] Capture API token counts (`TokenCounter`, `normalize_usage`).
+* [x] Implement fallback tokenizer counting (`FallbackTokenCounter` via tiktoken).
+* [x] Extend `RunResult` with timing/token fields (`tokens_per_second`, `token_source`, `decode_ms`, etc.).
+* [x] Extend SQLite schema with migration, `run_timings` table, `get_timing_summary()`.
+* [x] Add timing summary sections to Markdown report.
+* [x] Add `--timing-detail` CLI flag.
+* [x] Add `tokenizer` field to `configs/models.yaml`.
+
+## Acceptance criteria
+
+* [x] Report shows TTFT, wall time, decode time, completion tokens, and tokens/sec per task.
+* [x] Metrics are captured consistently across streaming and non-streaming responses.
+* [x] Fallback tokenizer counting works when API returns no usage data.
+* [x] SQLite `run_timings` table stores all timing metrics.
+* [x] `get_timing_summary()` returns per-model aggregates (mean, min, max, p95).
+* [x] Markdown report includes timing summary table and per-task timing table.
+* [x] `--timing-detail` CLI flag shows per-task timing in terminal output.
+* [x] Schema migration is safe on both fresh and existing databases.
 
 ## Tasks
 

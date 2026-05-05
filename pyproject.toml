@@ -16,6 +16,7 @@ dependencies = [
     "unidiff",
     "pytest",
     "pytest-asyncio",
+    "tiktoken",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +39,7 @@ long-context = [
 ]
 
 [project.scripts]
-bench-harness = "bench_harness.cli:app"
+bench-harness = "bench_harness.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
