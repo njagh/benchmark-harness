@@ -66,103 +66,22 @@ benchmark-harness/
 ```
 
 **Actions:**
-- [ ] Create all directories
-- [ ] Create all `__init__.py` stub files
-- [ ] Create `.gitignore` (exclude `runs/`, `__pycache__/`, `.env`, `*.pyc`, `*.db`)
-- [ ] Create `.env.example` with `OPENAI_BASE_URL`, `OPENAI_API_KEY` placeholders
+- [x] Create all directories
+- [x] Create all `__init__.py` stub files
+- [x] Create `.gitignore` (exclude `runs/`, `__pycache__/`, `.env`, `*.pyc`, `*.db`)
+- [x] Create `.env.example` with `OPENAI_BASE_URL`, `OPENAI_API_KEY` placeholders
 
 ### 1.2 Define pyproject.toml
 
 **File:** `pyproject.toml`
 
 **Required dependencies:**
-- `typer[all]` — CLI framework (with async and rich support)
-- `rich` — CLI output formatting, tables, progress bars
-- `pyyaml` — YAML config parsing
-- `pydantic` — task schema validation (used from M1 onward for configs)
-- `openai` — OpenAI-compatible client
-- `httpx` — async HTTP (used by openai client)
-- `sqlite-utils` — SQLite helpers (bulk insert, schema management, CSV export). Use THIS over raw sqlite3.
-- `jsonschema` — JSON schema validation (used by M4 scorer, but install early)
-- `jinja2` — prompt template rendering (used by M2, but install early)
-- `unidiff` — unified diff parsing (used by M5, but install early)
-- `pytest` — testing framework
-- `pytest-asyncio` — async test support
-
-All libraries are installed at project bootstrap to avoid piecemeal dependency management. Libraries not yet used by M1 will have their import guarded by lazy loading.
-
-**File structure:**
-- `[project]` with name `bench-harness`, version `0.1.0`
-- `[project.scripts]` entry point `bench-harness = "bench_harness.cli:app"`
-- `[tool.setuptools.packages.find]` where `where = ["src"]`
-- `[tool.pytest.ini_options]` with `testpaths = ["tests"]`
-
-### 1.3 Define configs/models.yaml
-
-**File:** `configs/models.yaml`
-
-**Content spec:**
-
-```yaml
-models:
-  agent-code:
-    provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
-    model: "agent-code"
-    backend: vllm
-    quantization: FP8
-    notes: "Qwen3.6-35B-A3B-FP8 via LiteLLM"
-
-  qwen-dense:
-    provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
-    model: "qwen-dense"
-    backend: vllm
-    quantization: FP8
-    notes: "Qwen3.6-27B-FP8"
-
-  max-brain:
-    provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
-    model: "max-brain"
-    backend: vllm
-    quantization: GPTQ-Int4
-    notes: "Qwen3.5-122B-A10B GPTQ Int4"
-```
+...
 
 **Actions:**
-- [ ] Write models.yaml with above 3 model entries
-- [ ] Document that additional models can be added following the same schema
-
-### 1.4 Define configs/suites.yaml
-
-**File:** `configs/suites.yaml`
-
-**Content spec:**
-
-```yaml
-suites:
-  smoke:
-    description: "Verify harness and model endpoint work"
-    task_dir: "tasks/smoke"
-    max_concurrency: 4
-    default_runs: 1
-```
-
-### 1.5 Implement config loader
-
-**File:** `src/bench_harness/config.py`
-
-**Functions:**
-- `load_model_config(path: str) -> dict` — loads and returns `configs/models.yaml`
-- `get_model(config: dict, alias: str) -> dict | None` — looks up a model by alias
-- `load_suite_config(path: str) -> dict` — loads and returns `configs/suites.yaml`
-- `get_suite(config: dict, name: str) -> dict | None` — looks up a suite by name
-
-**Actions:**
-- [ ] Implement using `pyyaml.safe_load()`
-- [ ] Resolve paths relative to project root (find `configs/` sibling to `src/`)
-- [ ] Add basic validation: raise if required keys missing
+- [x] Implement using `pyyaml.safe_load()`
+- [x] Resolve paths relative to project root (find `configs/` sibling to `src/`)
+- [x] Add basic validation: raise if required keys missing
 
 ### 1.6 Implement OpenAI-compatible client
 
@@ -185,9 +104,9 @@ suites:
 - Capture `response.usage` for token counts
 
 **Actions:**
-- [ ] Implement `OpenAICompatClient` class
-- [ ] Add error handling with typed exceptions (`APIConnectionError`, `APITimeoutError`)
-- [ ] Add logging of request metadata (model, base_url, timestamp)
+- [x] Implement `OpenAICompatClient` class
+- [x] Add error handling with typed exceptions (`APIConnectionError`, `APITimeoutError`)
+- [x] Add logging of request metadata (model, base_url, timestamp)
 
 ### 1.7 Implement simple completion runner
 
@@ -223,10 +142,10 @@ class RunResult:
 ```
 
 **Actions:**
-- [ ] Define `RunResult` dataclass
-- [ ] Implement `run()` with wall-clock timing
-- [ ] Generate `run_id` as UUID
-- [ ] Handle and capture exceptions without crashing
+- [x] Define `RunResult` dataclass
+- [x] Implement `run()` with wall-clock timing
+- [x] Generate `run_id` as UUID
+- [x] Handle and capture exceptions without crashing
 
 ### 1.8 Implement SQLite storage
 
@@ -278,10 +197,10 @@ CREATE TABLE environments (
 - `get_runs(suite_id: str | None = None, model_alias: str | None = None) -> list[dict]`
 
 **Actions:**
-- [ ] Implement table creation with `IF NOT EXISTS`
-- [ ] Implement `save_run` with parameterized queries
-- [ ] Implement `get_runs` with optional WHERE filters
-- [ ] Create index on `(suite_id, model_alias)`
+- [x] Implement table creation with `IF NOT EXISTS`
+- [x] Implement `save_run` with parameterized queries
+- [x] Implement `get_runs` with optional WHERE filters
+- [x] Create index on `(suite_id, model_alias)`
 
 ### 1.9 Add first five smoke tasks
 
@@ -366,8 +285,8 @@ scoring:
 ```
 
 **Actions:**
-- [ ] Create all 5 YAML files
-- [ ] Create `tasks/smoke/loader.py` or update `src/bench_harness/tasks/loaders.py` to read task YAMLs from a directory
+- [x] Create all 5 YAML files
+- [x] Create `tasks/smoke/loader.py` or update `src/bench_harness/tasks/loaders.py` to read task YAMLs from a directory
 
 ### 1.10 Implement task loader
 
@@ -379,9 +298,9 @@ scoring:
 - `filter_tasks(tasks: list[dict], family: str | None) -> list[dict]` — optional filter
 
 **Actions:**
-- [ ] Implement YAML loading with error handling per file
-- [ ] Validate required keys: `id`, `prompt`, `scoring`
-- [ ] Skip files with clear error message on load failure
+- [x] Implement YAML loading with error handling per file
+- [x] Validate required keys: `id`, `prompt`, `scoring`
+- [x] Skip files with clear error message on load failure
 
 ### 1.11 Implement CLI
 
@@ -417,10 +336,10 @@ scoring:
 6. Print summary to stdout
 
 **Actions:**
-- [ ] Implement typer CLI with all arguments
-- [ ] Wire config → tasks → runner → storage → report pipeline
-- [ ] Add `--help` documentation
-- [ ] Add `--dry-run` flag (prints tasks without executing)
+- [x] Implement typer CLI with all arguments
+- [x] Wire config → tasks → runner → storage → report pipeline
+- [x] Add `--help` documentation
+- [x] Add `--dry-run` flag (prints tasks without executing)
 
 ### 1.12 Implement JSONL artifact output
 
@@ -432,9 +351,9 @@ scoring:
 - Or consolidated: `{out_dir}/runs.jsonl` (append mode)
 
 **Actions:**
-- [ ] Implement consolidated JSONL writer
-- [ ] Ensure each line is a valid JSON object with all RunResult fields
-- [ ] Create output directory if it doesn't exist
+- [x] Implement consolidated JSONL writer
+- [x] Ensure each line is a valid JSON object with all RunResult fields
+- [x] Create output directory if it doesn't exist
 
 ### 1.13 Implement basic Markdown report
 
@@ -458,9 +377,9 @@ scoring:
 5. Raw output excerpts for failed tasks (first 200 chars)
 
 **Actions:**
-- [ ] Implement markdown generation with table formatting
-- [ ] Compute pass/fail from scoring (for M1, "success" exit_status = pass)
-- [ ] Write to both `.md` file and stdout summary
+- [x] Implement markdown generation with table formatting
+- [x] Compute pass/fail from scoring (for M1, "success" exit_status = pass)
+- [x] Write to both `.md` file and stdout summary
 
 ### 1.14 Implement scripts/run_smoke.sh
 
@@ -482,8 +401,8 @@ python -m bench_harness run \
 ```
 
 **Actions:**
-- [ ] Write script
-- [ ] `chmod +x`
+- [x] Write script
+- [x] `chmod +x`
 
 ### 1.15 Add basic tests
 
@@ -497,9 +416,9 @@ python -m bench_harness run \
 - `test_sqlite_save_and_retrieve` — round-trip save/get of a run record
 
 **Actions:**
-- [ ] Implement tests with pytest
-- [ ] Use fixture for temp SQLite DB path
-- [ ] Ensure tests pass with `pytest tests/`
+- [x] Implement tests with pytest
+- [x] Use fixture for temp SQLite DB path
+- [x] Ensure tests pass with `pytest tests/`
 
 ### 1.16 Define dataset registry config
 
@@ -542,22 +461,22 @@ datasets:
 - Dataset paths use `/mnt/datasets-big/evals/` for external data, `tasks/` for local YAML tasks
 
 **Actions:**
-- [ ] Create configs/datasets.yaml
-- [ ] Add dataset config loader to config.py
-- [ ] Add HF cache env var docs to .env.example
+- [x] Create configs/datasets.yaml
+- [x] Add dataset config loader to config.py
+- [x] Add HF cache env var docs to .env.example
 
 ---
 
 ## Acceptance Criteria Checklist
 
-- [ ] `python -m bench_harness run --suite smoke --models agent-code` runs end-to-end
-- [ ] `python -m bench_harness run --suite smoke --models agent-code,qwen-dense` runs against two models
-- [ ] SQLite database is created at output path with run records
-- [ ] JSONL artifacts are written to output directory
-- [ ] Markdown report is generated with summary table
-- [ ] All 5 smoke tasks execute and produce results
-- [ ] `pytest tests/` passes
-- [ ] `scripts/run_smoke.sh` works from project root
+- [x] `python -m bench_harness run --suite smoke --models agent-code` runs end-to-end
+- [x] `python -m bench_harness run --suite smoke --models agent-code,qwen-dense` runs against two models
+- [x] SQLite database is created at output path with run records
+- [x] JSONL artifacts are written to output directory
+- [x] Markdown report is generated with summary table
+- [x] All 5 smoke tasks execute and produce results
+- [x] `pytest tests/` passes
+- [x] `scripts/run_smoke.sh` works from project root
 
 ## Estimated Effort
 
@@ -567,21 +486,21 @@ datasets:
 
 | File | Status |
 |---|---|
-| `pyproject.toml` | To create |
-| `.env.example` | To create |
-| `.gitignore` | To create |
-| `configs/models.yaml` | To create |
-| `configs/suites.yaml` | To create |
+| `pyproject.toml` | Done |
+| `.env.example` | Done |
+| `.gitignore` | Done |
+| `configs/models.yaml` | Done |
+| `configs/suites.yaml` | Done |
 | `configs/scorers.yaml` | To create (stub) |
-| `src/bench_harness/__init__.py` | To create |
-| `src/bench_harness/cli.py` | To create |
-| `src/bench_harness/config.py` | To create |
-| `src/bench_harness/models/openai_client.py` | To create |
-| `src/bench_harness/tasks/loaders.py` | To create |
-| `src/bench_harness/runners/completion_runner.py` | To create |
-| `src/bench_harness/storage/sqlite.py` | To create |
-| `src/bench_harness/storage/artifacts.py` | To create |
-| `src/bench_harness/reports/markdown.py` | To create |
-| `tasks/smoke/*.yaml` (×5) | To create |
-| `scripts/run_smoke.sh` | To create |
-| `tests/test_smoke.py` | To create |
+| `src/bench_harness/__init__.py` | Done |
+| `src/bench_harness/cli.py` | Done |
+| `src/bench_harness/config.py` | Done |
+| `src/bench_harness/models/openai_client.py` | Done |
+| `src/bench_harness/tasks/loaders.py` | Done |
+| `src/bench_harness/runners/completion_runner.py` | Done |
+| `src/bench_harness/storage/sqlite.py` | Done |
+| `src/bench_harness/storage/artifacts.py` | Done |
+| `src/bench_harness/reports/markdown.py` | Done |
+| `tasks/smoke/*.yaml` (×5) | Done |
+| `scripts/run_smoke.sh` | Done |
+| `tests/test_smoke.py` | Done |

@@ -58,9 +58,9 @@ class Task(BaseModel):
 ```
 
 **Actions:**
-- [ ] Implement Pydantic models (or dataclasses with manual validation if avoiding Pydantic dependency)
-- [ ] Add `model_validate()` based loader
-- [ ] Document all fields with docstrings
+- [x] Implement Pydantic models (or dataclasses with manual validation if avoiding Pydantic dependency)
+- [x] Add `model_validate()` based loader
+- [x] Document all fields with docstrings
 
 ### 2.2 Implement task loader with schema validation
 
@@ -77,9 +77,9 @@ class Task(BaseModel):
 - Collect and report all load errors at end of directory scan
 
 **Actions:**
-- [ ] Update loader to use Task schema validation
-- [ ] Add warning logging for skipped tasks
-- [ ] Backward-compatible: accept old flat YAML format with migration warnings
+- [x] Update loader to use Task schema validation
+- [x] Add warning logging for skipped tasks
+- [x] Backward-compatible: accept old flat YAML format with migration warnings
 
 ### 2.3 Implement prompt template renderer
 
@@ -109,9 +109,9 @@ step_by_step.md   — "Plan step by step, then execute. {{ user_message }}"
 ```
 
 **Actions:**
-- [ ] Implement template rendering function
-- [ ] Create prompt template files in `configs/prompt_templates/`
-- [ ] Support file context injection (read file, inject as fenced code block)
+- [x] Implement template rendering function
+- [x] Create prompt template files in `configs/prompt_templates/`
+- [x] Support file context injection (read file, inject as fenced code block)
 
 ### 2.4 Implement task registry
 
@@ -136,9 +136,9 @@ step_by_step.md   — "Plan step by step, then execute. {{ user_message }}"
 - Add `bench_harness show-task <task_id>` command
 
 **Actions:**
-- [ ] Implement TaskRegistry class
-- [ ] Wire to CLI with new subcommands
-- [ ] Registry is a singleton accessible from runner
+- [x] Implement TaskRegistry class
+- [x] Wire to CLI with new subcommands
+- [x] Registry is a singleton accessible from runner
 
 ### 2.5 Add task versioning
 
@@ -151,9 +151,9 @@ step_by_step.md   — "Plan step by step, then execute. {{ user_message }}"
 - Report can group by task ID and show version used
 
 **Actions:**
-- [ ] Update Task model to include version
-- [ ] Update registry to handle versioned lookups
-- [ ] Add version to run records in SQLite
+- [x] Update Task model to include version
+- [x] Update registry to handle versioned lookups
+- [x] Add version to run records in SQLite
 
 ### 2.6 Add suite configuration
 
@@ -181,9 +181,9 @@ suites:
 ```
 
 **Actions:**
-- [ ] Update suites.yaml with coding_smoke suite
-- [ ] Update config loader to parse suite config fully
-- [ ] Suite config drives task loading, concurrency, and defaults
+- [x] Update suites.yaml with coding_smoke suite
+- [x] Update config loader to parse suite config fully
+- [x] Suite config drives task loading, concurrency, and defaults
 
 ### 2.7 Add validation tests
 
@@ -202,22 +202,22 @@ suites:
 - `test_file_context_injection` — file contents injected into prompt
 
 **Actions:**
-- [ ] Implement all tests
-- [ ] Use pytest fixtures for sample task YAMLs
-- [ ] Ensure tests run against schema, not external services
+- [x] Implement all tests
+- [x] Use pytest fixtures for sample task YAMLs
+- [x] Ensure tests run against schema, not external services
 
 ---
 
 ## Acceptance Criteria Checklist
 
-- [ ] New task can be added by dropping a YAML file into a task directory
-- [ ] Invalid task configs fail fast with field-level error messages
-- [ ] `bench_harness list-tasks` lists all registered tasks
-- [ ] `bench_harness list-tasks --family coding` filters correctly
-- [ ] `bench_harness show-task <id>` displays full task YAML
-- [ ] Prompt templates render correctly with context variables
-- [ ] Task versions are tracked and stored in run records
-- [ ] All validation tests pass
+- [x] New task can be added by dropping a YAML file into a task directory
+- [x] Invalid task configs fail fast with field-level error messages
+- [x] `bench_harness list-tasks` lists all registered tasks
+- [x] `bench_harness list-tasks --family coding` filters correctly
+- [x] `bench_harness show-task <id>` displays full task YAML
+- [x] Prompt templates render correctly with context variables
+- [x] Task versions are tracked and stored in run records
+- [x] All validation tests pass
 
 ## Estimated Effort
 
@@ -227,14 +227,14 @@ suites:
 
 | File | Status |
 |---|---|
-| `src/bench_harness/tasks/task_schema.py` | To create |
-| `src/bench_harness/tasks/registry.py` | To create |
-| `src/bench_harness/tasks/prompt_templates.py` | To create |
-| `configs/prompt_templates/plain.md` | To create |
-| `configs/prompt_templates/repl.md` | To create |
-| `configs/prompt_templates/terse.md` | To create |
-| `configs/prompt_templates/patch_only.md` | To create |
-| `configs/prompt_templates/architect.md` | To create |
-| `configs/prompt_templates/json_schema.md` | To create |
-| `configs/prompt_templates/step_by_step.md` | To create |
-| `tests/test_task_schema.py` | To create |
+| `src/bench_harness/tasks/task_schema.py` | Done |
+| `src/bench_harness/tasks/registry.py` | Done |
+| `src/bench_harness/tasks/prompt_templates.py` | Done |
+| `configs/prompt_templates/plain.md` | Done |
+| `configs/prompt_templates/repl.md` | Done |
+| `configs/prompt_templates/terse.md` | Done |
+| `configs/prompt_templates/patch_only.md` | Done |
+| `configs/prompt_templates/architect.md` | Done |
+| `configs/prompt_templates/json_schema.md` | Done |
+| `configs/prompt_templates/step_by_step.md` | Done |
+| `tests/test_task_schema.py` | Done |

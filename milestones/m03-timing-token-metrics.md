@@ -45,10 +45,10 @@ class TimingRecord:
 - `format_duration(ms: float) -> str` — human-readable duration string
 
 **Actions:**
-- [ ] Implement `TimingContext` context manager
-- [ ] Implement `TimingRecord` dataclass
-- [ ] Use `time.monotonic()` for wall-clock, `time.perf_counter()` for high-resolution
-- [ ] Add unit tests for timing accuracy (sleep-based)
+- [x] Implement `TimingContext` context manager
+- [x] Implement `TimingRecord` dataclass
+- [x] Use `time.monotonic()` for wall-clock, `time.perf_counter()` for high-resolution
+- [x] Add unit tests for timing accuracy (sleep-based)
 
 ### 3.2 Implement streaming TTFT capture
 
@@ -95,10 +95,10 @@ class StreamMetrics:
 - Attach `StreamMetrics` to the `RunResult`
 
 **Actions:**
-- [ ] Implement `StreamingTimer` class
-- [ ] Implement `StreamMetrics` dataclass
-- [ ] Update `OpenAICompatClient.chat_complete_stream()` to use `StreamingTimer`
-- [ ] Update `completion_runner.py` to capture `StreamMetrics` in `RunResult`
+- [x] Implement `StreamingTimer` class
+- [x] Implement `StreamMetrics` dataclass
+- [x] Update `OpenAICompatClient.chat_complete_stream()` to use `StreamingTimer`
+- [x] Update `completion_runner.py` to capture `StreamMetrics` in `RunResult`
 
 ### 3.3 Capture API token counts
 
@@ -134,9 +134,9 @@ class TokenCounter:
 - **Fallback**: If `usage` is `None`, mark fields as `-1` and log warning
 
 **Actions:**
-- [ ] Implement `TokenCounter` class
-- [ ] Handle missing `usage` field gracefully (set to `-1`, log warning)
-- [ ] Update `completion_runner.py` to include `TokenCounter` results in `RunResult`
+- [x] Implement `TokenCounter` class
+- [x] Handle missing `usage` field gracefully (set to `-1`, log warning)
+- [x] Update `completion_runner.py` to include `TokenCounter` results in `RunResult`
 
 ### 3.4 Implement fallback tokenizer counting
 
@@ -166,10 +166,10 @@ class FallbackTokenCounter:
 - Only used as fallback when API doesn't return usage data
 
 **Actions:**
-- [ ] Add `tiktoken` to `pyproject.toml` dependencies
-- [ ] Implement `FallbackTokenCounter`
-- [ ] Add tokenizer selection logic: prefer API counts, fall back to local counting
-- [ ] Add model-level tokenizer config in `configs/models.yaml`
+- [x] Add `tiktoken` to `pyproject.toml` dependencies
+- [x] Implement `FallbackTokenCounter`
+- [x] Add tokenizer selection logic: prefer API counts, fall back to local counting
+- [x] Add model-level tokenizer config in `configs/models.yaml`
 
 ### 3.5 Extend RunResult with timing and token fields
 
@@ -191,9 +191,9 @@ class RunResult:
 ```
 
 **Actions:**
-- [ ] Add new fields to `RunResult` dataclass
-- [ ] Update `completion_runner.run()` to populate all new fields
-- [ ] Ensure non-streaming path still computes `tokens_per_second` from wall time
+- [x] Add new fields to `RunResult` dataclass
+- [x] Update `completion_runner.run()` to populate all new fields
+- [x] Ensure non-streaming path still computes `tokens_per_second` from wall time
 
 ### 3.6 Extend SQLite schema for timing metrics
 
@@ -253,11 +253,11 @@ CREATE TABLE run_timings (
 - Add `_migration_version` table to track applied migrations
 
 **Actions:**
-- [ ] Implement schema migration with column existence checks
-- [ ] Add `run_timings` table creation
-- [ ] Implement `save_run_timing`
-- [ ] Implement `get_timing_summary` with SQL aggregation queries
-- [ ] Add migration version tracking
+- [x] Implement schema migration with column existence checks
+- [x] Add `run_timings` table creation
+- [x] Implement `save_run_timing`
+- [x] Implement `get_timing_summary` with SQL aggregation queries
+- [x] Add migration version tracking
 
 ### 3.7 Add per-model timing summary to report
 
@@ -290,10 +290,10 @@ CREATE TABLE run_timings (
 ```
 
 **Actions:**
-- [ ] Add timing summary section to `generate_report()`
-- [ ] Add per-task timing table
-- [ ] Add "slowest tasks" table sorted by `total_wall_ms`
-- [ ] Compute P95 using sorted list indexing (no external stats library needed)
+- [x] Add timing summary section to `generate_report()`
+- [x] Add per-task timing table
+- [x] Add "slowest tasks" table sorted by `total_wall_ms`
+- [x] Compute P95 using sorted list indexing (no external stats library needed)
 
 ### 3.8 Add timing metrics CLI output
 
@@ -312,9 +312,9 @@ Task: smoke.factual_001 | Model: agent-code
 ```
 
 **Actions:**
-- [ ] Add `--timing-detail` flag to CLI
-- [ ] Format timing output using `rich` console
-- [ ] Include token source indicator (api/fallback)
+- [x] Add `--timing-detail` flag to CLI
+- [x] Format timing output using `rich` console
+- [x] Include token source indicator (api/fallback)
 
 ### 3.9 Add timing metric tests
 
@@ -334,24 +334,24 @@ Task: smoke.factual_001 | Model: agent-code
 - `test_schema_migration_safe` — migration doesn't fail on fresh or existing DB
 
 **Actions:**
-- [ ] Implement all tests
-- [ ] Use `time.sleep()` for timing accuracy tests with tolerance
-- [ ] Mock streaming responses for `StreamingTimer` tests
-- [ ] Use temp SQLite DB for storage tests
+- [x] Implement all tests
+- [x] Use `time.sleep()` for timing accuracy tests with tolerance
+- [x] Mock streaming responses for `StreamingTimer` tests
+- [x] Use temp SQLite DB for storage tests
 
 ---
 
 ## Acceptance Criteria Checklist
 
-- [ ] Report shows TTFT, wall time, decode time, completion tokens, and tokens/sec per task
-- [ ] Metrics are captured consistently across streaming and non-streaming responses
-- [ ] Fallback tokenizer counting works when API returns no usage data
-- [ ] SQLite `run_timings` table stores all timing metrics
-- [ ] `get_timing_summary()` returns per-model aggregates (mean, min, max, p95)
-- [ ] Markdown report includes timing summary table and per-task timing table
-- [ ] `--timing-detail` CLI flag shows per-task timing in terminal output
-- [ ] Schema migration is safe on both fresh and existing databases
-- [ ] All timing metric tests pass
+- [x] Report shows TTFT, wall time, decode time, completion tokens, and tokens/sec per task
+- [x] Metrics are captured consistently across streaming and non-streaming responses
+- [x] Fallback tokenizer counting works when API returns no usage data
+- [x] SQLite `run_timings` table stores all timing metrics
+- [x] `get_timing_summary()` returns per-model aggregates (mean, min, max, p95)
+- [x] Markdown report includes timing summary table and per-task timing table
+- [x] `--timing-detail` CLI flag shows per-task timing in terminal output
+- [x] Schema migration is safe on both fresh and existing databases
+- [x] All timing metric tests pass
 
 ## Estimated Effort
 
@@ -361,13 +361,13 @@ Task: smoke.factual_001 | Model: agent-code
 
 | File | Status |
 |---|---|
-| `src/bench_harness/metrics/timing.py` | To create |
-| `src/bench_harness/metrics/tokens.py` | To create |
-| `src/bench_harness/metrics/__init__.py` | To create |
+| `src/bench_harness/metrics/timing.py` | Done |
+| `src/bench_harness/metrics/tokens.py` | Done |
+| `src/bench_harness/metrics/__init__.py` | Done |
 | `src/bench_harness/runners/completion_runner.py` | Update (extend RunResult) |
 | `src/bench_harness/models/openai_client.py` | Update (StreamingTimer integration) |
 | `src/bench_harness/storage/sqlite.py` | Update (schema migration + run_timings table) |
 | `src/bench_harness/reports/markdown.py` | Update (timing report sections) |
 | `src/bench_harness/cli.py` | Update (--timing-detail flag) |
-| `tests/test_timing.py` | To create |
+| `tests/test_timing.py` | Done |
 | `configs/models.yaml` | Update (add tokenizer field) |
