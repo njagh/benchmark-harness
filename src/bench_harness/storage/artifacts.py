@@ -68,3 +68,64 @@ def save_run_artifact(result: RunResult, out_dir: str) -> Path:
 
     logger.debug("Wrote artifact: %s", artifact_path)
     return artifact_path
+
+
+def save_judge_artifact(
+    run_id: str,
+    out_dir: str,
+    raw_response: str | None,
+    parsed_scores: dict[str, Any],
+    rubric_name: str,
+    judge_model: str,
+    prompt: str,
+) -> dict[str, Path]:
+    """Save judge-specific artifacts for a run.
+
+    Writes three files:
+    - judge_raw_{run_id}.json: Raw judge LLM response
+    - judge_parsed_{run_id}.json: Parsed scores
+    - judge_prompt_{run_id}.txt: The prompt sent to the judge
+
+    Args:
+        run_id: The run ID this evaluation corresponds to.
+        out_dir: Output directory path.
+        raw_response: Raw judge model response text.
+        parsed_scores: Dict of parsed judge scores.
+        rubric_name: Name of the rubric used.
+        judge_model: Judge model alias.
+        prompt: The prompt sent to the judge.
+
+    Returns:
+        Dict mapping file type to Path.
+    """
+    output = Path(out_dir)
+    output.mkdir(parents=True, exist_ok=True)
+
+    paths: dict[str, Path] = {}
+
+    # Save raw response
+    raw_path = output / f"judge_raw_{run_id}.json"
+    if raw_response is not None:
+        raw_path.write_text(raw_response)
+        logger.debug("Wrote raw judge response: %s", raw_path)
+    paths["raw_response"] = raw_path
+
+    # Save parsed scores
+    parsed_path = output / f"judge_parsed_{run_id}.json"
+    parsed_data = {
+        "run_id": run_id,
+        "rubric_name": rubric_name,
+        "judge_model": judge_model,
+        "scores": parsed_scores,
+    }
+    parsed_path.write_text(json.dumps(parsed_data, indent=2, default=str))
+    logger.debug("Wrote parsed judge scores: %s", parsed_path)
+    paths["parsed_scores"] = parsed_path
+
+    # Save judge prompt
+    prompt_path = output / f"judge_prompt_{run_id}.txt"
+    prompt_path.write_text(prompt)
+    logger.debug("Wrote judge prompt: %s", prompt_path)
+    paths["prompt"] = prompt_path
+
+    return paths

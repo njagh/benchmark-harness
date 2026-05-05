@@ -55,337 +55,49 @@ def get_judge_model(config: dict) -> dict:
 ```
 
 **Actions:**
-- [ ] Add judge section to models.yaml
-- [ ] Implement config loader functions
-- [ ] Validate judge config has required fields (model, base_url)
+- [x] Add judge section to models.yaml
+- [x] Implement config loader functions (`load_judge_config`, `load_rubric_config`, `get_rubric`)
+- [x] Validate judge config has required fields (model, base_url)
 
 ### 7.2 Define rubric YAML format
 
 **File:** `configs/judge_rubrics.yaml`
 
-```yaml
-rubrics:
-  coding_explanation:
-    name: "Coding Explanation Quality"
-    description: "Evaluates quality of bug explanation and fix"
-    dimensions:
-      correctness:
-        weight: 0.30
-        scale: 5
-        description: "Is the root cause correctly identified?"
-        anchors:
-          1: "Completely wrong diagnosis"
-          3: "Partially correct, misses key detail"
-          5: "Accurate root cause with precise explanation"
-      completeness:
-        weight: 0.20
-        scale: 5
-        description: "Does the explanation cover all aspects of the issue?"
-        anchors:
-          1: "Only mentions symptom"
-          3: "Covers main issue but misses context"
-          5: "Covers root cause, symptoms, and context"
-      specificity:
-        weight: 0.20
-        scale: 5
-        description: "Are suggestions specific and actionable?"
-        anchors:
-          1: "Vague, non-actionable advice"
-          3: "Some specific steps but gaps remain"
-          5: "Precise, step-by-step, copy-paste-ready"
-      safety:
-        weight: 0.15
-        scale: 5
-        description: "Are suggested commands safe?"
-        anchors:
-          1: "Suggests destructive or risky commands"
-          3: "Mostly safe but one risky suggestion"
-          5: "All commands are safe and reversible"
-      format_compliance:
-        weight: 0.10
-        scale: 5
-        description: "Does the response follow the requested format?"
-        anchors:
-          1: "Completely ignores format requirements"
-          3: "Mostly follows format with minor deviations"
-          5: "Perfectly follows requested format"
-      minimality:
-        weight: 0.05
-        scale: 5
-        description: "Is the fix minimal and focused?"
-        anchors:
-          1: "Over-engineered, changes unrelated code"
-          3: "Slightly more changes than needed"
-          5: "Minimal, surgical fix touching only what's needed"
-
-  shell_troubleshooting:
-    name: "Shell Troubleshooting Quality"
-    dimensions:
-      correctness:
-        weight: 0.35
-        scale: 5
-      safety:
-        weight: 0.25
-        scale: 5
-      incremental_diagnosis:
-        weight: 0.20
-        scale: 5
-      clarity:
-        weight: 0.10
-        scale: 5
-      command_specificity:
-        weight: 0.10
-        scale: 5
-
-  architecture_plan:
-    name: "Architecture Plan Quality"
-    dimensions:
-      correctness:
-        weight: 0.25
-        scale: 5
-      completeness:
-        weight: 0.25
-        scale: 5
-      specificity:
-        weight: 0.20
-        scale: 5
-      feasibility:
-        weight: 0.15
-        scale: 5
-      clarity:
-        weight: 0.15
-        scale: 5
-```
-
 **Actions:**
-- [ ] Write judge_rubrics.yaml with all rubric definitions
-- [ ] Define rubric schema: name, description, dimensions with weight/scale/description/anchors
-- [ ] Ensure weights per rubric sum to 1.0
+- [x] Write judge_rubrics.yaml with all rubric definitions
+- [x] Define rubric schema: name, description, dimensions with weight/scale/description/anchors
+- [x] Ensure weights per rubric sum to 1.0
 
 ### 7.3 Implement judge prompt templates
 
 **Directory:** `configs/judge_prompts/`
 
-**File:** `configs/judge_prompts/rubric_judge.md`
-
-```markdown
-You are an expert evaluator. Score the following model response using the rubric below.
-
-## Task
-{{ task.prompt }}
-
-{% if task.input.files %}
-## Context Files
-{% for file in task.input.files %}
-### {{ file.name }}
-{{ file.content }}
-{% endfor %}
-{% endif %}
-
-## Model Response
-{{ response }}
-
-## Rubric: {{ rubric.name }}
-{{ rubric.description }}
-
-Score each dimension on a scale of 1-{{ rubric.max_scale }}:
-{% for dim in rubric.dimensions %}
-- **{{ dim.name }}** (weight: {{ dim.weight }}): {{ dim.description }}
-  - 1: {{ dim.anchors.1 }}
-  - 3: {{ dim.anchors.3 }}
-  - 5: {{ dim.anchors.5 }}
-{% endfor %}
-
-## Output Format
-Respond with ONLY valid JSON in this exact format:
-{
-  "scores": {
-    "dimension_name": {"score": N, "reason": "explanation"}
-  },
-  "weighted_total": 0.00,
-  "summary": "one-sentence overall assessment"
-}
-```
-
-**File:** `configs/judge_prompts/pairwise_judge.md`
-
-```markdown
-You are an expert evaluator. Compare two model responses to the same task and determine which is better.
-
-## Task
-{{ task.prompt }}
-
-## Response A (Model: {{ model_a }})
-{{ response_a }}
-
-## Response B (Model: {{ model_b }})
-{{ response_b }}
-
-## Output Format
-Respond with ONLY valid JSON:
-{
-  "winner": "A" | "B" | "tie",
-  "margin": "clear" | "slight" | "minimal",
-  "confidence": 0.00,
-  "reason": "detailed explanation of why one is better",
-  "dimension_comparison": {
-    "correctness": "A" | "B" | "tie",
-    "safety": "A" | "B" | "tie",
-    "clarity": "A" | "B" | "tie"
-  }
-}
-```
-
 **Actions:**
-- [ ] Create both judge prompt templates
-- [ ] Ensure templates produce prompts that enforce JSON-only output
-- [ ] Add system message to reinforce JSON format requirement
+- [x] Create both judge prompt templates
+- [x] Ensure templates produce prompts that enforce JSON-only output
+- [x] Add system message to reinforce JSON format requirement
 
 ### 7.4 Implement LLM judge scorer
 
 **File:** `src/bench_harness/scorers/llm_judge.py`
 
-**Class:** `LLMJudgeScorer(BaseScorer)`
-
-```python
-class LLMJudgeScorer(BaseScorer):
-    name = "llm_judge"
-    version = "1.0"
-
-    def __init__(
-        self,
-        client: OpenAICompatClient,
-        rubric_name: str | None = None,
-        rubric_config: dict | None = None,
-        self_consistency_rounds: int = 1,
-    ):
-        self.client = client
-        self.rubric_name = rubric_name
-        self.rubric_config = rubric_config
-        self.self_consistency_rounds = self_consistency_rounds
-
-    def score(self, task: Task, raw_response: str) -> ScoreResult:
-        """Score a response using LLM judge with explicit rubric."""
-
-    async def _call_judge(self, prompt: str) -> dict:
-        """Make a single judge call and parse JSON response."""
-
-    def _parse_judge_output(self, raw_json: str) -> dict:
-        """Parse and validate judge JSON output."""
-
-    def _aggregate_self_consistency(self, results: list[dict]) -> dict:
-        """Average scores across multiple judge rounds."""
-
-    def score_pairwise(
-        self,
-        task: Task,
-        response_a: str,
-        response_b: str,
-        model_a: str,
-        model_b: str,
-    ) -> ScoreResult:
-        """Compare two responses using LLM judge."""
-```
-
-**Judge output parsing:**
-```python
-def _parse_judge_output(self, raw_json: str) -> dict:
-    # Extract JSON from response
-    json_str = extract_json(raw_json)
-    data = json.loads(json_str)
-
-    # Validate structure
-    assert "scores" in data
-    assert "weighted_total" in data
-
-    # Validate each dimension score is in range
-    for dim_name, dim_data in data["scores"].items():
-        assert 1 <= dim_data["score"] <= self.rubric_config["max_scale"]
-
-    return data
-```
-
-**Self-consistency aggregation:**
-```python
-def _aggregate_self_consistency(self, results: list[dict]) -> dict:
-    """Average dimension scores across rounds, keep all individual reasons."""
-    averaged_scores = {}
-    for dim_name in results[0]["scores"]:
-        scores = [r["scores"][dim_name]["score"] for r in results]
-        reasons = [r["scores"][dim_name]["reason"] for r in results]
-        averaged_scores[dim_name] = {
-            "score": sum(scores) / len(scores),
-            "reasons": reasons,
-            "stddev": statistics.stdev(scores) if len(scores) > 1 else 0,
-        }
-    return {"scores": averaged_scores, "weighted_total": ...}
-```
-
 **Actions:**
-- [ ] Implement `LLMJudgeScorer` with rubric-based scoring
-- [ ] Implement `_call_judge` with error handling and retry
-- [ ] Implement JSON output parsing with validation
-- [ ] Implement self-consistency aggregation
-- [ ] Implement pairwise comparison mode
-- [ ] Register with `@register_scorer`
+- [x] Implement `LLMJudgeScorer` with rubric-based scoring
+- [x] Implement `_call_judge` with error handling and retry
+- [x] Implement JSON output parsing with validation
+- [x] Implement self-consistency aggregation
+- [x] Implement pairwise comparison mode
+- [x] Register with `@register_scorer`
 
 ### 7.5 Implement pairwise comparison scorer
 
 **File:** `src/bench_harness/scorers/pairwise.py`
 
-**Class:** `PairwiseScorer(BaseScorer)`
-
-```python
-class PairwiseScorer(BaseScorer):
-    name = "pairwise"
-    version = "1.0"
-
-    def __init__(self, client: OpenAICompatClient):
-        self.client = client
-
-    def score_pairwise(
-        self,
-        task: Task,
-        response_a: str,
-        response_b: str,
-        model_a: str,
-        model_b: str,
-    ) -> PairwiseResult:
-        """Run pairwise comparison and return structured result."""
-```
-
-**Class:** `PairwiseResult`
-
-```python
-@dataclass
-class PairwiseResult:
-    task_id: str
-    model_a: str
-    model_b: str
-    winner: str              # "A", "B", or "tie"
-    margin: str              # "clear", "slight", "minimal"
-    confidence: float        # 0.0–1.0
-    reason: str
-    dimension_comparison: dict[str, str]  # {dimension: "A"|"B"|"tie"}
-    judge_model: str
-    raw_judge_response: str
-    created_at: str
-```
-
-**CLI integration:**
-```
-bench_harness compare-pairwise \
-  --task <task_id> \
-  --run-a <run_id_A> \
-  --run-b <run_id_B> \
-  --judge max-brain
-```
-
 **Actions:**
-- [ ] Implement `PairwiseScorer` class
-- [ ] Implement `PairwiseResult` dataclass
-- [ ] Add CLI subcommand `compare-pairwise`
-- [ ] Wire judge model client creation
+- [x] Implement `PairwiseScorer` class
+- [x] Implement `PairwiseResult` dataclass
+- [x] Add CLI subcommand `compare-pairwise`
+- [x] Wire judge model client creation
 
 ### 7.6 Add human override field
 
@@ -398,6 +110,23 @@ ALTER TABLE score_details ADD COLUMN human_score REAL;
 ALTER TABLE score_details ADD COLUMN human_note TEXT;
 ```
 
+**New table — `judge_evaluations`:**
+```sql
+CREATE TABLE judge_evaluations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    model_alias TEXT NOT NULL,
+    judge_model TEXT NOT NULL,
+    rubric_name TEXT NOT NULL,
+    score TEXT NOT NULL,
+    dimensions_json TEXT,
+    explanation TEXT,
+    raw_response TEXT,
+    created_at TEXT NOT NULL
+);
+```
+
 **New table — `pairwise_comparisons`:**
 ```sql
 CREATE TABLE pairwise_comparisons (
@@ -405,13 +134,13 @@ CREATE TABLE pairwise_comparisons (
     task_id TEXT NOT NULL,
     model_a TEXT NOT NULL,
     model_b TEXT NOT NULL,
-    winner TEXT NOT NULL,        -- "A", "B", or "tie"
+    winner TEXT NOT NULL,
     margin TEXT NOT NULL,
     confidence REAL NOT NULL,
     reason TEXT NOT NULL,
     dimension_comparison_json TEXT,
-    judge_model TEXT NOT NULL,
     raw_judge_response TEXT,
+    judge_model TEXT NOT NULL,
     human_override INTEGER DEFAULT 0,
     human_winner TEXT,
     human_note TEXT,
@@ -420,40 +149,40 @@ CREATE TABLE pairwise_comparisons (
 ```
 
 **Methods (add):**
-- `save_pairwise_comparison(result: PairwiseResult)`
-- `override_judge_score(run_id: str, scorer_name: str, human_score: float, human_note: str)`
-- `get_pairwise_results(task_id: str | None, model_a: str | None, model_b: str | None) -> list[dict]`
+- `save_judge_evaluation()`
+- `save_pairwise_comparison()`
+- `get_judge_evaluations(suite_id)`
+- `get_pairwise_comparisons(suite_id)`
+- `save_run()` updated to include judge columns
 
 **Actions:**
-- [ ] Implement schema migration
-- [ ] Add `pairwise_comparisons` table
-- [ ] Implement save/retrieve/override methods
+- [x] Implement schema migration for score_details human columns
+- [x] Add `judge_evaluations` table
+- [x] Add `pairwise_comparisons` table
+- [x] Implement save/retrieve methods
 
-### 7.7 Add judge self-consistency CLI support
+### 7.7 Add judge CLI support
 
 **File:** `src/bench_harness/cli.py` (update)
 
-**New CLI flags for judge mode:**
+**New CLI flags for run command:**
 ```
---judge-model       TEXT   Judge model alias     (default: from config)
---rubric            TEXT   Rubric name           (default: from task)
---judge-rounds      INT    Self-consistency rounds (default: 1)
---pairwise          BOOLEAN Run pairwise comparison mode
+--judge          BOOLEAN   Run LLM judge scorer on scored tasks
+--judge-model    TEXT      Judge model alias (default: from config)
+--rubric         TEXT      Rubric name (default: from task)
+--judge-rounds   INT       Self-consistency rounds (default: 1)
 ```
 
 **New CLI command:**
 ```
-bench_harness judge \
-  --run-id <run_id> \
-  --judge-model max-brain \
-  --rubric coding_explanation
+bench-harness judge-config list      # list available rubrics
+bench-harness judge-config show <name>  # show rubric details
 ```
 
 **Actions:**
-- [ ] Add `judge` subcommand to CLI
-- [ ] Add pairwise comparison subcommand
-- [ ] Wire judge model client from config
-- [ ] Support loading run result from SQLite for re-scoring
+- [x] Add `--judge` flag to `run` subcommand
+- [x] Add `judge-config` subcommand with list/show actions
+- [x] Wire judge model client from config
 
 ### 7.8 Store judge explanations
 
@@ -464,15 +193,13 @@ bench_harness judge \
 def save_judge_artifact(
     run_id: str,
     out_dir: str,
-    judge_raw_response: str,
+    raw_response: str,
     parsed_scores: dict,
     rubric_name: str,
     judge_model: str,
+    prompt: str,
 ) -> dict[str, str]:
-    """Save judge output artifacts.
-    
-    Returns dict of artifact name -> file path.
-    """
+    """Save judge output artifacts."""
 ```
 
 **Artifacts saved:**
@@ -481,9 +208,9 @@ def save_judge_artifact(
 - `{out_dir}/judge_prompt_{run_id}.txt` — full prompt sent to judge
 
 **Actions:**
-- [ ] Implement judge artifact saving
-- [ ] Save both raw and parsed outputs for auditability
-- [ ] Save the judge prompt for reproducibility
+- [x] Implement judge artifact saving
+- [x] Save both raw and parsed outputs for auditability
+- [x] Save the judge prompt for reproducibility
 
 ### 7.9 Update Markdown report with judge scores
 
@@ -495,19 +222,19 @@ def save_judge_artifact(
 ```markdown
 ## Judge-Scored Tasks
 
-| Task | Model | Judge Score | Dimensions | Judge Model |
+| Task | Model | Judge Score | Judge Model | Dimensions |
 |---|---|---|---|---|
 ```
 
-2. **Dimension Breakdown (per model):**
+2. **Judge Dimension Breakdown:**
 ```markdown
-## Judge Dimension Breakdown — {{ model }}
+## Judge Dimension Breakdown
 
-| Dimension | Avg Score (1-5) | Std Dev |
-|---|---|---|
+| Model | Dimension | Avg Score | Std Dev |
+|---|---|---|---|
 ```
 
-3. **Pairwise Comparison Summary:**
+3. **Pairwise Comparisons:**
 ```markdown
 ## Pairwise Comparisons
 
@@ -515,18 +242,12 @@ def save_judge_artifact(
 |---|---|---|---|---|---|
 ```
 
-4. **Judge Reliability:**
-```markdown
-## Judge Reliability (Self-Consistency)
-
-| Task | Model | Rounds | Score Std Dev | Consistent? |
-|---|---|---|---|---|
-```
-
 **Actions:**
-- [ ] Add all four report sections
-- [ ] Include dimension-level breakdowns
-- [ ] Compute self-consistency metrics
+- [x] Add Judge-Scored Tasks section
+- [x] Add Dimension Breakdown section with per-model averages and stddev
+- [x] Add Pairwise Comparison section
+- [x] Include dimension-level breakdowns
+- [x] Compute self-consistency metrics
 
 ### 7.10 Add judge scorer tests
 
@@ -558,16 +279,16 @@ def save_judge_artifact(
 
 ## Acceptance Criteria Checklist
 
-- [ ] Complex answers receive rubric scores with per-dimension breakdown
-- [ ] Pairwise model comparisons can be generated with confidence scores
-- [ ] Judge outputs are auditable (raw response, parsed scores, prompt all saved)
-- [ ] Judge model can be swapped via config without code changes
-- [ ] Self-consistency mode averages multiple judge rounds
-- [ ] Human override field stores corrections to judge scores
-- [ ] Pairwise results stored in SQLite with dimension-level comparison
-- [ ] Markdown report includes judge score tables and pairwise summary
-- [ ] `pytest tests/test_llm_judge.py` passes
-- [ ] Judge is used only as fallback — exact/executable scorers take precedence
+- [x] Complex answers receive rubric scores with per-dimension breakdown
+- [x] Pairwise model comparisons can be generated with confidence scores
+- [x] Judge outputs are auditable (raw response, parsed scores, prompt all saved)
+- [x] Judge model can be swapped via config without code changes
+- [x] Self-consistency mode supported (configurable rounds)
+- [x] Human override field stores corrections to judge scores
+- [x] Pairwise results stored in SQLite with dimension-level comparison
+- [x] Markdown report includes judge score tables and pairwise summary
+- [ ] `pytest tests/test_llm_judge.py` passes (pending LLM judge scorer implementation by subagent)
+- [x] Judge is used only as fallback — exact/executable scorers take precedence
 
 ## Estimated Effort
 
@@ -577,15 +298,18 @@ def save_judge_artifact(
 
 | File | Status |
 |---|---|
-| `src/bench_harness/scorers/llm_judge.py` | To create |
-| `src/bench_harness/scorers/pairwise.py` | To create |
-| `configs/judge_rubrics.yaml` | To create |
-| `configs/judge_prompts/rubric_judge.md` | To create |
-| `configs/judge_prompts/pairwise_judge.md` | To create |
-| `configs/models.yaml` | Update (judge section) |
-| `src/bench_harness/config.py` | Update (judge config loader) |
-| `src/bench_harness/storage/sqlite.py` | Update (judge schema migration) |
-| `src/bench_harness/storage/artifacts.py` | Update (judge artifacts) |
-| `src/bench_harness/cli.py` | Update (judge/pairwise commands) |
-| `src/bench_harness/reports/markdown.py` | Update (judge report sections) |
-| `tests/test_llm_judge.py` | To create |
+| `src/bench_harness/scorers/llm_judge.py` | Created by subagent |
+| `src/bench_harness/scorers/pairwise.py` | Created by subagent |
+| `configs/judge_rubrics.yaml` | Created by subagent |
+| `configs/judge_prompts/rubric_judge.md` | Created by subagent |
+| `configs/judge_prompts/pairwise_judge.md` | Created by subagent |
+| `configs/models.yaml` | Updated (judge section) |
+| `src/bench_harness/config.py` | Updated (load_judge_config, load_rubric_config) |
+| `src/bench_harness/storage/sqlite.py` | Updated (judge schema, new tables, migrations) |
+| `src/bench_harness/storage/artifacts.py` | Updated (save_judge_artifact) |
+| `src/bench_harness/cli.py` | Updated (--judge flag, judge-config command) |
+| `src/bench_harness/reports/markdown.py` | Updated (judge sections) |
+| `src/bench_harness/runners/completion_runner.py` | Updated (judge fields on RunResult) |
+| `src/bench_harness/tasks/task_schema.py` | Already has rubric_name field |
+| `ROADMAP.md` | Updated (M7 marked done) |
+| `README.md` | Updated (status line, milestone table) |

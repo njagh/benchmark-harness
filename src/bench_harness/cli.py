@@ -16,6 +16,7 @@ from bench_harness.config import (
     get_model,
     load_suite_config,
     resolve_task_dir,
+    load_judge_config,
 )
 from bench_harness.models.openai_client import OpenAICompatClient
 from bench_harness.runners.completion_runner import CompletionRunner
@@ -47,6 +48,7 @@ def run(
     out: str | None = typer.Option(None, "--out", help="Output directory"),
     timing_detail: bool = typer.Option(False, "--timing-detail", help="Show per-task timing in CLI output"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print tasks without executing"),
+    judge: bool = typer.Option(False, "--judge", help="Run LLM judge scorer on scored tasks"),
 ):
     """Run benchmark suite against one or more models."""
     suite_names = [s.strip() for s in suite.split(",")]
@@ -296,10 +298,74 @@ def show_task(
         console.print(f"    patterns: {expected.patterns}")
 
 
+judge_app = typer.Typer(
+    name="judge-config",
+    help="Manage judge configuration and rubrics",
+    add_completion=False,
+)
+
+
+@judge_app.command()
+def list_rubrics():
+    """List available judge rubrics."""
+    from bench_harness.config import load_rubric_config
+    try:
+        rubrics = load_rubric_config()
+        if not rubrics:
+            console.print("[yellow]No rubrics found.[/yellow]")
+            return
+        # Config format is {"rubrics": {"name": {...}, ...}}
+        rubric_dict = rubrics.get("rubrics", rubrics) if isinstance(rubrics, dict) else {}
+        if not rubric_dict:
+            console.print("[yellow]No rubrics found.[/yellow]")
+            return
+        if isinstance(rubric_dict, dict):
+            console.print(f"[cyan]Available rubrics:[/cyan]")
+            for name in sorted(rubric_dict.keys()):
+                rubric = rubric_dict[name]
+                if isinstance(rubric, dict):
+                    desc = rubric.get("description", "")
+                    console.print(f"  - {name}: {desc}")
+                else:
+                    console.print(f"  - {name}")
+        else:
+            console.print(f"[dim](Single rubric configuration)[/dim]")
+    except FileNotFoundError:
+        console.print("[yellow]No judge_rubrics.yaml found. Add rubrics to configs/judge_rubrics.yaml[/yellow]")
+
+
+@judge_app.command()
+def show_rubric(
+    rubric_name: str = typer.Argument(..., help="Rubric name to display"),
+):
+    """Show details of a specific rubric."""
+    from bench_harness.config import load_rubric_config
+    try:
+        rubrics = load_rubric_config()
+        # Config format is {"rubrics": {"name": {...}, ...}}
+        rubric_dict = rubrics.get("rubrics", rubrics) if isinstance(rubrics, dict) else {}
+        rubric = rubric_dict.get(rubric_name)
+        if rubric is None:
+            console.print(f"[red]Rubric '{rubric_name}' not found.[/red]")
+            return
+        if isinstance(rubric, dict):
+            console.print(f"[cyan]Rubric: {rubric_name}[/cyan]")
+            for key, value in rubric.items():
+                console.print(f"  {key}: {value}")
+        else:
+            console.print(f"[cyan]Rubric: {rubric_name}[/cyan]")
+            console.print(f"  {rubric}")
+    except FileNotFoundError:
+        console.print(f"[red]Rubric '{rubric_name}' not found.[/red]")
+
+
 def main():
     """Entry point when called as `bench-harness`."""
     app()
 
+
+# Register judge_app as a group under the main app
+app.add_typer(judge_app, name="judge-config")
 
 if __name__ == "__main__":
     main()

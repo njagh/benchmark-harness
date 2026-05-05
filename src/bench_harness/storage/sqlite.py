@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import json
 import logging
+import datetime as dt
 from pathlib import Path
 from typing import Any
+from datetime import datetime, timezone
 
 from sqlite_utils import Database
 
@@ -40,6 +42,24 @@ class SQLiteStore:
         "score_explanation": "text",
     }
 
+    # M7 judge columns on runs table
+    _RUNS_JUDGE_COLUMNS = {
+        "judge_score": "float",
+        "judge_explanation": "text",
+        "judge_dimensions": "text",
+        "judge_model": "text",
+        "human_override": "int",
+        "human_score": "float",
+        "human_note": "text",
+    }
+
+    # M7 columns to add to score_details table
+    _SCORE_DETAILS_EXTRA_COLUMNS = {
+        "human_override": "int",
+        "human_score": "float",
+        "human_note": "text",
+    }
+
     # Columns that should exist on the environments table (M3 env fields)
     _ENV_EXTRA_COLUMNS = {
         "vllm_version": "str",
@@ -65,6 +85,8 @@ class SQLiteStore:
         self._create_run_timings_table()
         self._create_score_details_table()
         self._create_indexes()
+        self._create_judge_evaluations_table()
+        self._create_pairwise_comparisons_table()
         logger.info("SQLite store initialized: %s", self.db_path)
 
     def _create_runs_table(self) -> None:
@@ -133,6 +155,15 @@ class SQLiteStore:
                     logger.warning(
                         "Failed to add column %s to runs table: %s", col, e
                     )
+        for col, col_type in self._RUNS_JUDGE_COLUMNS.items():
+            if col not in existing:
+                logger.info("Migrating runs table: adding judge column %s", col)
+                try:
+                    self.db["runs"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to runs table: %s", col, e
+                    )
 
     def _migrate_environments_schema(self) -> None:
         """Add any missing env columns to the environments table."""
@@ -190,6 +221,20 @@ class SQLiteStore:
             pk="id",
             if_not_exists=True,
         )
+        # Migrate human override columns onto score_details
+        existing = set(self.db["score_details"].columns)
+        for col, col_type in self._SCORE_DETAILS_EXTRA_COLUMNS.items():
+            if col not in existing:
+                logger.info(
+                    "Migrating score_details table: adding column %s", col
+                )
+                try:
+                    self.db["score_details"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to score_details table: %s",
+                        col, e,
+                    )
 
     def _create_indexes(self) -> None:
         """Create indexes for common query patterns."""
@@ -200,8 +245,64 @@ class SQLiteStore:
             ["suite_id", "model_alias"], if_not_exists=True
         )
 
+    def _create_judge_evaluations_table(self) -> None:
+        """Create the judge_evaluations table for LLM judge data."""
+        self.db["judge_evaluations"].create(
+            {
+                "id": int,
+                "run_id": str,
+                "task_id": str,
+                "model_alias": str,
+                "judge_model": str,
+                "rubric_name": str,
+                "score": str,
+                "dimensions_json": str,
+                "explanation": str,
+                "raw_response": str,
+                "created_at": str,
+            },
+            pk="id",
+            if_not_exists=True,
+        )
+
+    def _create_pairwise_comparisons_table(self) -> None:
+        """Create the pairwise_comparisons table for pairwise judge data."""
+        self.db["pairwise_comparisons"].create(
+            {
+                "id": int,
+                "task_id": str,
+                "model_a": str,
+                "model_b": str,
+                "winner": str,
+                "margin": str,
+                "confidence": float,
+                "reason": str,
+                "dimension_comparison_json": str,
+                "raw_judge_response": str,
+                "judge_model": str,
+                "human_override": int,
+                "human_winner": str,
+                "human_note": str,
+                "created_at": str,
+            },
+            pk="id",
+            if_not_exists=True,
+        )
+        # Indexes for pairwise comparisons
+        self.db["pairwise_comparisons"].create_index(
+            ["task_id", "judge_model"], if_not_exists=True
+        )
+
     def save_run(self, result: RunResult) -> None:
         """Save a single run result with all timing and token fields."""
+        judge_dimensions_json = None
+        if result.judge_dimensions is not None:
+            judge_dimensions_json = json.dumps(result.judge_dimensions)
+
+        score_secondary_json = None
+        if result.score_secondary is not None:
+            score_secondary_json = json.dumps(result.score_secondary)
+
         self.db["runs"].insert(
             {
                 "run_id": result.run_id,
@@ -220,7 +321,7 @@ class SQLiteStore:
                 "raw_response": result.raw_response,
                 "score_primary": result.score_primary,
                 "scorer_version": result.scorer_version,
-                "score_secondary": json.dumps(result.score_secondary) if result.score_secondary else None,
+                "score_secondary": score_secondary_json,
                 "score_explanation": result.score_explanation,
                 "error_message": result.error_message,
                 "created_at": result.created_at,
@@ -229,6 +330,14 @@ class SQLiteStore:
                 "tokens_per_second_total": result.tokens_per_second_total,
                 "token_source": result.token_source,
                 "chunk_count": 0,
+                # M7 judge fields
+                "judge_score": result.judge_score,
+                "judge_explanation": result.judge_explanation,
+                "judge_dimensions": judge_dimensions_json,
+                "judge_model": result.judge_model,
+                "human_override": 1 if result.human_override else 0,
+                "human_score": result.human_score,
+                "human_note": result.human_note,
             },
         )
 
@@ -266,6 +375,9 @@ class SQLiteStore:
         """Bulk insert run results."""
         rows = []
         for r in results:
+            judge_dimensions_json = None
+            if r.judge_dimensions is not None:
+                judge_dimensions_json = json.dumps(r.judge_dimensions)
             rows.append(
                 {
                     "run_id": r.run_id,
@@ -292,6 +404,14 @@ class SQLiteStore:
                     "tokens_per_second_total": r.tokens_per_second_total,
                     "token_source": r.token_source,
                     "chunk_count": 0,
+                    # M7 judge fields
+                    "judge_score": r.judge_score,
+                    "judge_explanation": r.judge_explanation,
+                    "judge_dimensions": judge_dimensions_json,
+                    "judge_model": r.judge_model,
+                    "human_override": 1 if r.human_override else 0,
+                    "human_score": r.human_score,
+                    "human_note": r.human_note,
                 }
             )
         self.db["runs"].insert_all(rows)
@@ -517,3 +637,139 @@ class SQLiteStore:
                 row["p95_ttft_ms"] = 0.0
 
         return rows
+
+    def save_judge_evaluation(
+        self,
+        run_id: str,
+        task_id: str,
+        model_alias: str,
+        judge_model: str,
+        rubric_name: str,
+        score: str,
+        dimensions: dict[str, Any] | None = None,
+        explanation: str | None = None,
+        raw_response: str | None = None,
+    ) -> None:
+        """Save an LLM judge evaluation to the judge_evaluations table.
+
+        Args:
+            run_id: The run ID this evaluation corresponds to.
+            task_id: Task identifier.
+            model_alias: Model being judged.
+            judge_model: The judge model that produced the score.
+            rubric_name: Name of the rubric used.
+            score: JSON string of the judge score.
+            dimensions: Optional dimension scores dict.
+            explanation: Optional judge explanation text.
+            raw_response: Raw judge model response.
+        """
+        dimensions_json = None
+        if dimensions is not None:
+            dimensions_json = json.dumps(dimensions)
+
+        self.db["judge_evaluations"].insert(
+            {
+                "run_id": run_id,
+                "task_id": task_id,
+                "model_alias": model_alias,
+                "judge_model": judge_model,
+                "rubric_name": rubric_name,
+                "score": score,
+                "dimensions_json": dimensions_json,
+                "explanation": explanation,
+                "raw_response": raw_response,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    def save_pairwise_comparison(
+        self,
+        task_id: str,
+        model_a: str,
+        model_b: str,
+        winner: str,
+        margin: str,
+        confidence: float,
+        reason: str | None = None,
+        dimension_comparison: dict[str, Any] | None = None,
+        raw_judge_response: str | None = None,
+        judge_model: str | None = None,
+        human_override: bool = False,
+        human_winner: str | None = None,
+        human_note: str | None = None,
+    ) -> None:
+        """Save a pairwise comparison to the pairwise_comparisons table.
+
+        Args:
+            task_id: Task identifier.
+            model_a: First model alias.
+            model_b: Second model alias.
+            winner: "A", "B", or "tie".
+            margin: Margin of victory as string.
+            confidence: Confidence score 0.0-1.0.
+            reason: Judge's reasoning.
+            dimension_comparison: Per-dimension comparison scores.
+            raw_judge_response: Raw judge response text.
+            judge_model: Judge model that produced the comparison.
+            human_override: Whether a human overrode the result.
+            human_winner: Human-decided winner if overridden.
+            human_note: Human reviewer note.
+        """
+        dim_comparison_json = None
+        if dimension_comparison is not None:
+            dim_comparison_json = json.dumps(dimension_comparison)
+
+        self.db["pairwise_comparisons"].insert(
+            {
+                "task_id": task_id,
+                "model_a": model_a,
+                "model_b": model_b,
+                "winner": winner,
+                "margin": margin,
+                "confidence": confidence,
+                "reason": reason,
+                "dimension_comparison_json": dim_comparison_json,
+                "raw_judge_response": raw_judge_response,
+                "judge_model": judge_model,
+                "human_override": 1 if human_override else 0,
+                "human_winner": human_winner,
+                "human_note": human_note,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    def get_judge_evaluations(self, suite_id: str) -> list[dict[str, Any]]:
+        """Get all judge evaluations for a suite.
+
+        Args:
+            suite_id: Suite identifier.
+
+        Returns:
+            List of judge evaluation records.
+        """
+        query = """
+            SELECT je.*, r.task_id as run_task_id, r.model_alias as run_model_alias
+            FROM judge_evaluations je
+            JOIN runs r ON je.run_id = r.run_id
+            WHERE r.suite_id = ?
+            ORDER BY je.created_at DESC
+        """
+        return list(self.db.query(query, [suite_id]))
+
+    def get_pairwise_comparisons(self, suite_id: str) -> list[dict[str, Any]]:
+        """Get all pairwise comparisons for a suite.
+
+        Args:
+            suite_id: Suite identifier.
+
+        Returns:
+            List of pairwise comparison records.
+        """
+        query = """
+            SELECT pc.*
+            FROM pairwise_comparisons pc
+            JOIN runs r ON pc.task_id = r.task_id
+            WHERE r.suite_id = ?
+            ORDER BY pc.created_at DESC
+        """
+        return list(self.db.query(query, [suite_id]))

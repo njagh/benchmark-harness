@@ -53,6 +53,13 @@ class RunResult:
         validation_passed: Whether shell/config validation passed (non-code tasks only).
         validation_command: The validation command that was run (non-code tasks only).
         validation_output: Raw output from validation command (non-code tasks only).
+        judge_score: LLM judge score (M7).
+        judge_explanation: LLM judge explanation text (M7).
+        judge_dimensions: Per-dimension scores from judge (M7).
+        judge_model: Judge model alias used (M7).
+        human_override: Whether human overrode the judge score (M7).
+        human_score: Human-provided override score (M7).
+        human_note: Human reviewer note (M7).
     """
 
     run_id: str
@@ -91,6 +98,14 @@ class RunResult:
     validation_passed: bool | None = None
     validation_command: str | None = None
     validation_output: str | None = None
+    # M7 judge fields
+    judge_score: float | None = None
+    judge_explanation: str | None = None
+    judge_dimensions: dict[str, Any] | None = None
+    judge_model: str | None = None
+    human_override: bool | None = None
+    human_score: float | None = None
+    human_note: str | None = None
 
 
 class CompletionRunner:

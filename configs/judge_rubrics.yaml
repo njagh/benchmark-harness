@@ -1,0 +1,70 @@
+rubrics:
+  coding_quality:
+    name: "coding_quality"
+    description: "Evaluate code generation quality"
+    max_scale: 5
+    dimensions:
+      correctness:
+        weight: 0.40
+        scale: 5
+        description: "Does the code solve the problem correctly?"
+        anchors:
+          1: "Does not work at all, wrong logic"
+          2: "Partially works but major logic errors"
+          3: "Works for basic cases but misses edge cases"
+          4: "Mostly correct with minor edge case issues"
+          5: "Correct for all cases, handles edge cases"
+      readability:
+        weight: 0.20
+        scale: 5
+        description: "Is the code clean and well-structured?"
+        anchors:
+          1: "Unreadable, no structure or naming"
+          3: "Moderately readable, some structure"
+          5: "Clean, well-named, well-structured"
+      efficiency:
+        weight: 0.20
+        scale: 5
+        description: "Is the algorithm efficient?"
+        anchors:
+          1: "Inefficient, unnecessary computations"
+          3: "Acceptable performance for typical cases"
+          5: "Optimized with efficient algorithms"
+      robustness:
+        weight: 0.20
+        scale: 5
+        description: "Does it handle errors gracefully?"
+        anchors:
+          1: "No error handling, crashes easily"
+          3: "Basic error handling present"
+          5: "Comprehensive error handling, defensive"
+
+  config_quality:
+    name: "config_quality"
+    description: "Evaluate configuration quality"
+    max_scale: 5
+    dimensions:
+      correctness:
+        weight: 0.50
+        scale: 5
+        description: "Does the config work as intended?"
+        anchors:
+          1: "Config is invalid or broken"
+          3: "Config works for basic cases"
+          5: "Config is correct and robust"
+      completeness:
+        weight: 0.30
+        scale: 5
+        description: "Are all necessary options present?"
+        anchors:
+          1: "Critical options missing"
+          3: "Most options present, few missing"
+          5: "All options present and properly set"
+      best_practices:
+        weight: 0.20
+        scale: 5
+        description: "Does it follow best practices?"
+        anchors:
+          1: "Violates multiple best practices"
+          3: "Follows most best practices"
+          5: "Follows all best practices, well-organized"

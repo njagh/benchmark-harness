@@ -82,6 +82,10 @@ class TaskExpected(BaseModel):
         default=None,
         description="Inline test code to use for evaluation.",
     )
+    rubric_name: str | None = Field(
+        default=None,
+        description="Name of the rubric (from judge_rubrics.yaml) for LLM judge evaluation.",
+    )
 
 
 class TaskScoring(BaseModel):

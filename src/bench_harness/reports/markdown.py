@@ -221,6 +221,9 @@ def generate_report(
     # Coding Agent Ranking (when code_type is present in runs)
     _append_coding_agent_ranking(lines, runs)
 
+    # M7 Judge sections
+    _append_judge_sections(lines, runs, model_stats)
+
     # Write to file
     output_path = Path(out_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -406,6 +409,113 @@ def _append_coding_agent_ranking(lines: list[str], runs: list[dict[str, Any]]) -
         )
 
     lines.append(f"")
+
+
+def _append_judge_sections(
+    lines: list[str], runs: list[dict[str, Any]], model_stats: dict[str, list[dict]],
+) -> None:
+    """Append judge-scored task, dimension breakdown, and pairwise comparison sections.
+
+    Args:
+        lines: List of markdown line strings to append to.
+        runs: List of run result dicts.
+        model_stats: Pre-computed dict mapping model alias to list of runs.
+    """
+    # 1. Judge-Scored Tasks
+    judge_runs = [r for r in runs if r.get("judge_score") is not None]
+    if judge_runs:
+        lines.append(f"## Judge-Scored Tasks")
+        lines.append(f"")
+        lines.append(f"| Task | Model | Judge Score | Judge Model | Dimensions |")
+        lines.append(f"|---|---|---|---|---|")
+
+        for r in judge_runs:
+            task_id = r.get("task_id", "unknown")
+            alias = r.get("model_alias", "unknown")
+            score = f"{r['judge_score']:.3f}" if r.get("judge_score") is not None else "N/A"
+            judge_model = r.get("judge_model") or "N/A"
+            dims = r.get("judge_dimensions") or {}
+            if isinstance(dims, str):
+                try:
+                    import json
+                    dims = json.loads(dims)
+                except (json.JSONDecodeError, ValueError):
+                    dims = {}
+            dim_str = ", ".join(f"{k}={v}" for k, v in dims.items()) if dims else "-"
+            lines.append(f"| {task_id} | {alias} | {score} | {judge_model} | {dim_str} |")
+
+        lines.append(f"")
+
+    # 2. Judge Dimension Breakdown
+    if judge_runs:
+        lines.append(f"## Judge Dimension Breakdown")
+        lines.append(f"")
+        lines.append(f"| Model | Dimension | Avg Score | Std Dev |")
+        lines.append(f"|---|---|---|---|")
+
+        # Gather dimension scores per model
+        dim_scores: dict[str, dict[str, list[float]]] = {}
+        for r in judge_runs:
+            alias = r.get("model_alias", "unknown")
+            dims = r.get("judge_dimensions") or {}
+            if isinstance(dims, str):
+                try:
+                    import json
+                    dims = json.loads(dims)
+                except (json.JSONDecodeError, ValueError):
+                    dims = {}
+            for dim_name, dim_value in dims.items():
+                if dim_name not in dim_scores:
+                    dim_scores[dim_name] = {}
+                if alias not in dim_scores[dim_name]:
+                    dim_scores[dim_name][alias] = []
+                try:
+                    dim_scores[dim_name][alias].append(float(dim_value))
+                except (ValueError, TypeError):
+                    pass
+
+        def _stddev(values: list[float]) -> float:
+            if len(values) < 2:
+                return 0.0
+            mean = sum(values) / len(values)
+            variance = sum((x - mean) ** 2 for x in values) / len(values)
+            return variance ** 0.5
+
+        for dim_name in sorted(dim_scores.keys()):
+            for alias in sorted(dim_scores[dim_name].keys()):
+                values = dim_scores[dim_name][alias]
+                avg = sum(values) / max(len(values), 1)
+                sd = _stddev(values)
+                lines.append(
+                    f"| {alias} | {dim_name} | {avg:.3f} | {sd:.3f} |"
+                )
+
+        lines.append(f"")
+
+    # 3. Pairwise Comparisons
+    pairwise_runs = [r for r in runs if r.get("pairwise_winner") is not None]
+    if pairwise_runs:
+        lines.append(f"## Pairwise Comparisons")
+        lines.append(f"")
+        lines.append(f"| Task | Model A | Model B | Winner | Margin | Confidence |")
+        lines.append(f"|---|---|---|---|---|---|")
+
+        for r in pairwise_runs:
+            task_id = r.get("task_id", "unknown")
+            model_a = r.get("pairwise_model_a", "N/A")
+            model_b = r.get("pairwise_model_b", "N/A")
+            winner = r.get("pairwise_winner", "N/A")
+            margin = r.get("pairwise_margin") or "N/A"
+            confidence = r.get("pairwise_confidence")
+            if confidence is not None:
+                conf_str = f"{confidence:.3f}"
+            else:
+                conf_str = "N/A"
+            lines.append(
+                f"| {task_id} | {model_a} | {model_b} | {winner} | {margin} | {conf_str} |"
+            )
+
+        lines.append(f"")
 
 
 def print_summary(runs: list[dict[str, Any]], suite_id: str) -> None:

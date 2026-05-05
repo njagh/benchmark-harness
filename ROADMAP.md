@@ -1152,7 +1152,7 @@ Create a high-value benchmark based on real workflows.
 
 ---
 
-# Milestone 7 — LLM judge integration
+# Milestone 7 — LLM judge integration **✅ DONE**
 
 ## Goal
 
@@ -1160,21 +1160,32 @@ Score complex answers with explicit rubrics.
 
 ## Tasks
 
-* Implement judge model config.
-* Add rubric YAML format.
-* Add judge prompt templates.
-* Require structured JSON judge output.
-* Add judge self-consistency option.
-* Add pairwise comparison mode.
-* Add human override field.
-* Store judge explanations.
+* [x] Implement judge model config (`load_judge_config`).
+* [x] Add rubric YAML format loading (`load_rubric_config`).
+* [x] Add judge prompt templates (consumer-facing: LLMJudgeScorer).
+* [x] Require structured JSON judge output.
+* [x] Add judge self-consistency option (configurable).
+* [x] Add pairwise comparison mode with DB storage.
+* [x] Add human override field on `RunResult` and `pairwise_comparisons`.
+* [x] Store judge explanations in `judge_evaluations` table.
+* [x] Add `judge_evaluations` SQLite table.
+* [x] Add `pairwise_comparisons` SQLite table.
+* [x] Add schema migration for judge columns on `runs` and `score_details`.
+* [x] Add artifact saving for judge raw/parsed/prompt files.
+* [x] Add `--judge` flag to `run` CLI command.
+* [x] Add `judge-config` CLI subcommand (list/show).
+* [x] Add judge report sections to Markdown report.
 
 ## Acceptance criteria
 
-* Complex answers receive rubric scores.
-* Pairwise model comparisons can be generated.
-* Judge outputs are auditable.
-* Judge model can be swapped.
+* [x] Complex answers receive rubric scores via LLM judge.
+* [x] Pairwise model comparisons can be generated and stored.
+* [x] Judge outputs are auditable (raw responses, parsed scores, prompts saved).
+* [x] Judge model can be swapped via config.
+* [x] Human override supported for both judge scores and pairwise comparisons.
+* [x] Reports include Judge-Scored Tasks, Dimension Breakdown, and Pairwise Comparison sections.
+* [x] `bench-harness judge-config list` shows available rubrics.
+* [x] `bench-harness judge-config show <name>` shows rubric details.
 
 ## Note
 

@@ -111,3 +111,62 @@ def load_scorer_config(path: str | None = None) -> dict[str, Any]:
     config_path = path or "scorers.yaml"
     data = load_yaml(config_path)
     return data
+
+
+def load_judge_config(path: str | None = None) -> dict[str, Any]:
+    """Load and return configs/models.yaml judge section.
+
+    Parses the judge configuration from models.yaml, which includes:
+    - model_alias: The model to use for judging
+    - temperature: Sampling temperature
+    - max_tokens: Max output tokens
+    - self_consistency_rounds: Number of self-consistency rounds
+    - rubrics: Rubric configuration (default rubric, path to rubric YAML)
+
+    Args:
+        path: Optional override for the config file path.
+
+    Returns:
+        Dict with judge configuration, or empty dict if no judge section.
+    """
+    model_config = load_model_config(path)
+    judge_config = model_config.get("judge", {})
+    return judge_config
+
+
+def load_rubric_config(path: str | None = None) -> dict[str, Any]:
+    """Load and return configs/judge_rubrics.yaml.
+
+    Args:
+        path: Optional override for the config file path.
+
+    Returns:
+        Dict mapping rubric name to rubric definition.
+    """
+    if path is None:
+        # Try to get default path from judge config
+        try:
+            judge_cfg = load_judge_config()
+            path = judge_cfg.get("rubrics", {}).get("path", "judge_rubrics.yaml")
+        except FileNotFoundError:
+            path = "judge_rubrics.yaml"
+    return load_yaml(path)
+
+
+def get_rubric(rubric_name: str) -> dict[str, Any] | None:
+    """Look up a rubric by name from judge_rubrics.yaml.
+
+    Args:
+        rubric_name: Name of the rubric.
+
+    Returns:
+        Rubric definition dict or None.
+    """
+    try:
+        rubrics = load_rubric_config()
+        if isinstance(rubrics, dict):
+            return rubrics.get(rubric_name)
+        # If the file returned a single rubric (not a map)
+        return rubrics if rubric_name == "default" else None
+    except FileNotFoundError:
+        return None
