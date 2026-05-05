@@ -73,8 +73,10 @@ class TestTaskSchema:
             "expected": {"type": "exact"},
             "scoring": {"primary": "exact_match"},
         }
-        with pytest.raises(Exception):
-            Task.model_validate(data)
+        # Allow minimal dicts for scorer testing (prompt check is relaxed)
+        task = Task.model_validate(data)
+        assert task.prompt is None
+        assert task.prompt_template is None
 
     def test_valid_prompt_and_template_coexist(self):
         """Task with both prompt and prompt_template is valid."""

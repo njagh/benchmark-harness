@@ -5,6 +5,7 @@ Supports schema migration for adding new timing and token metric columns.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,14 @@ class SQLiteStore:
         "chunk_count": "int",
     }
 
+    # M4 scoring columns
+    _RUNS_SCORE_COLUMNS = {
+        "score_primary": "float",
+        "score_secondary": "text",
+        "scorer_version": "text",
+        "score_explanation": "text",
+    }
+
     # Columns that should exist on the environments table (M3 env fields)
     _ENV_EXTRA_COLUMNS = {
         "vllm_version": "str",
@@ -54,6 +63,7 @@ class SQLiteStore:
         self._migrate_runs_schema()
         self._migrate_environments_schema()
         self._create_run_timings_table()
+        self._create_score_details_table()
         self._create_indexes()
         logger.info("SQLite store initialized: %s", self.db_path)
 
@@ -77,6 +87,8 @@ class SQLiteStore:
                 "raw_response": str,
                 "score_primary": float,
                 "scorer_version": str,
+                "score_secondary": str,
+                "score_explanation": str,
                 "error_message": str,
                 "created_at": str,
             },
@@ -101,11 +113,20 @@ class SQLiteStore:
         )
 
     def _migrate_runs_schema(self) -> None:
-        """Add any missing timing/token columns to the runs table."""
+        """Add any missing timing/token and scoring columns to the runs table."""
         existing = set(self.db["runs"].columns)
         for col, col_type in self._RUNS_EXTRA_COLUMNS.items():
             if col not in existing:
                 logger.info("Migrating runs table: adding column %s", col)
+                try:
+                    self.db["runs"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to runs table: %s", col, e
+                    )
+        for col, col_type in self._RUNS_SCORE_COLUMNS.items():
+            if col not in existing:
+                logger.info("Migrating runs table: adding score column %s", col)
                 try:
                     self.db["runs"].add_column(col, col_type)
                 except Exception as e:
@@ -154,6 +175,22 @@ class SQLiteStore:
             if_not_exists=True,
         )
 
+    def _create_score_details_table(self) -> None:
+        """Create the score_details table for per-scorer breakdown."""
+        self.db["score_details"].create(
+            {
+                "id": int,
+                "run_id": str,
+                "scorer_name": str,
+                "score": float,
+                "passed": int,
+                "details_json": str,
+                "explanation": str,
+            },
+            pk="id",
+            if_not_exists=True,
+        )
+
     def _create_indexes(self) -> None:
         """Create indexes for common query patterns."""
         self.db["runs"].create_index(
@@ -181,8 +218,10 @@ class SQLiteStore:
                 "total_wall_ms": result.total_wall_ms,
                 "exit_status": result.exit_status,
                 "raw_response": result.raw_response,
-                "score_primary": None,
-                "scorer_version": None,
+                "score_primary": result.score_primary,
+                "scorer_version": result.scorer_version,
+                "score_secondary": json.dumps(result.score_secondary) if result.score_secondary else None,
+                "score_explanation": result.score_explanation,
                 "error_message": result.error_message,
                 "created_at": result.created_at,
                 # M3 timing fields
@@ -195,6 +234,10 @@ class SQLiteStore:
 
         # Also save to run_timings for detailed timing analysis
         self.save_run_timing(result)
+
+        # Save score details to score_details table
+        if result.score_secondary:
+            self.save_score_details(result.run_id, result.score_secondary)
 
     def save_run_timing(self, result: RunResult) -> None:
         """Save timing data to the run_timings table."""
@@ -241,6 +284,8 @@ class SQLiteStore:
                     "raw_response": r.raw_response,
                     "score_primary": None,
                     "scorer_version": None,
+                    "score_secondary": None,
+                    "score_explanation": None,
                     "error_message": r.error_message,
                     "created_at": r.created_at,
                     "tokens_per_second": r.tokens_per_second,
@@ -383,6 +428,32 @@ class SQLiteStore:
                     "created_at": td.get("created_at", ""),
                 },
             )
+
+    def save_score_details(
+        self,
+        run_id: str,
+        score_secondary: dict[str, Any],
+    ) -> None:
+        """Save individual scorer details to the score_details table.
+
+        Args:
+            run_id: The run ID to associate with.
+            score_secondary: Dict of {scorer_name: ScoreResult} or {scorer_name: score_dict}.
+        """
+        for scorer_name, score_data in score_secondary.items():
+            if isinstance(score_data, dict):
+                self.db["score_details"].insert(
+                    {
+                        "run_id": run_id,
+                        "scorer_name": scorer_name,
+                        "score": score_data.get("score", 0),
+                        "passed": score_data.get("passed", False),
+                        "details_json": json.dumps(
+                            score_data.get("details", {}), default=str
+                        ),
+                        "explanation": score_data.get("explanation"),
+                    },
+                )
 
     def get_timing_summary(
         self,

@@ -61,6 +61,10 @@ class RunResult:
     tokens_per_second: float = 0.0
     tokens_per_second_total: float = 0.0
     token_source: str = "api"
+    score_primary: float | None = None
+    score_secondary: dict[str, Any] | None = None
+    scorer_version: str | None = None
+    score_explanation: str | None = None
     exit_status: str = "success"
     error_message: str | None = None
     created_at: str = field(
@@ -114,6 +118,7 @@ class CompletionRunner:
         temperature = params.get("temperature", 0)
         max_tokens = params.get("max_tokens", 4096)
 
+        scorer_version: str | None = None
         start_time = datetime.now(timezone.utc)
 
         try:
@@ -169,6 +174,48 @@ class CompletionRunner:
             tps = compute_tokens_per_second(completion_tokens, decode_ms)
             tps_total = compute_tokens_per_second(total_tokens, total_wall_ms)
 
+            # Score the response
+            primary_scorer_name = task.get("scoring", {}).get("primary", "")
+            secondary_scorer_names = task.get("scoring", {}).get("secondary", [])
+            scorer_names = [primary_scorer_name] + (secondary_scorer_names or [])
+            primary_score = None
+            primary_explanation = None
+            secondary_scores: dict[str, Any] = {}
+
+            if scorer_names:
+                from bench_harness.scorers import score_all, get_scorer
+                try:
+                    # Use a minimal task-like dict for scorers
+                    task_dict = {
+                        "id": task_id,
+                        "scoring": task.get("scoring", {}),
+                        "expected": task.get("expected", {}),
+                    }
+                    # Run primary scorer
+                    if primary_scorer_name:
+                        scorer = get_scorer(primary_scorer_name)
+                        score_result = scorer.score(task_dict, content)
+                        primary_score = score_result.score
+                        primary_explanation = score_result.explanation
+                        scorer_version = score_result.scorer_version
+
+                    # Run secondary scorers
+                    for sec_name in (secondary_scorer_names or []):
+                        try:
+                            sec_scorer = get_scorer(sec_name)
+                            sec_result = sec_scorer.score(task_dict, content)
+                            secondary_scores[sec_name] = {
+                                "score": sec_result.score,
+                                "passed": sec_result.passed,
+                                "explanation": sec_result.explanation,
+                            }
+                        except Exception as e:
+                            logger.warning(
+                                "Secondary scorer '%s' failed: %s", sec_name, e
+                            )
+                except Exception as e:
+                    logger.warning("Scoring failed for task %s: %s", task_id, e)
+
             result = RunResult(
                 run_id=run_id,
                 suite_id=suite_id,
@@ -187,6 +234,10 @@ class CompletionRunner:
                 tokens_per_second=tps,
                 tokens_per_second_total=tps_total,
                 token_source=token_source,
+                score_primary=primary_score,
+                score_secondary=secondary_scores if secondary_scores else None,
+                scorer_version=scorer_version if primary_scorer_name else None,
+                score_explanation=primary_explanation,
                 exit_status="success",
                 created_at=start_time.isoformat(),
             )

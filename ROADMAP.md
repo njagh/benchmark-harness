@@ -1056,27 +1056,37 @@ Capture performance metrics (TTFT, wall time, decode time, token counts) compara
 
 ---
 
-# Milestone 4 — Basic scorers
+# Milestone 4 — Basic scorers **✅ DONE**
 
 ## Goal
 
-Support automatic scoring for simple tasks.
+Support automatic deterministic scoring for simple tasks: exact match, multiple-choice, regex, JSON schema, contains/does-not-contain, and format compliance.
 
 ## Tasks
 
-* Implement exact match scorer.
-* Implement multiple-choice scorer.
-* Implement regex scorer.
-* Implement JSON schema scorer.
-* Implement contains/does-not-contain scorer.
-* Implement format-compliance scorer.
-* Add scorer unit tests.
+* [x] Implement base scorer interface with registry (`@register_scorer` decorator).
+* [x] Implement `ExactMatchScorer` with whitespace normalization and case-insensitive option.
+* [x] Implement `MultipleChoiceScorer` with regex-based answer extraction.
+* [x] Implement `RegexScorer` with all/any/none modes and partial scoring.
+* [x] Implement `JsonSchemaScorer` with JSON extraction from markdown fences, repair, and validation.
+* [x] Implement `ContainsScorer` with required/absent substring matching.
+* [x] Implement `FormatComplianceScorer` with 10 format checks (numbered list, filler, line count, etc.).
+* [x] Wire scorers into runner with primary/secondary scoring.
+* [x] Extend `RunResult` with scoring fields.
+* [x] Add `score_details` table to SQLite with schema migration.
+* [x] Add scoring sections to Markdown report.
+* [x] Load scorer config from `configs/scorers.yaml`.
+* [x] Add 44 unit tests covering all scorers and registry.
 
 ## Acceptance criteria
 
-* Smoke tasks produce real scores.
-* Format failures are visible in reports.
-* Scorers are deterministic and tested.
+* [x] All six scorers (exact_match, multiple_choice, regex, json_schema, contains, format_compliance) are implemented and registered.
+* [x] Smoke tasks produce real scores with all configured scorers.
+* [x] Format failures are visible in the Markdown report.
+* [x] Scorers are deterministic and fully tested.
+* [x] Score results are stored in SQLite with details.
+* [x] Runner invokes scorers automatically based on task YAML scoring config.
+* [x] `pytest tests/test_scorers.py` passes with full coverage on scorer modules.
 
 ---
 

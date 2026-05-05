@@ -69,10 +69,10 @@ def list_scorers() -> list[str]:
 ```
 
 **Actions:**
-- [ ] Implement `BaseScorer` ABC
-- [ ] Implement `ScoreResult` dataclass
-- [ ] Implement scorer registry with auto-registration via decorator
-- [ ] Add `score_all(task, response, scorer_names)` helper that runs multiple scorers
+- [x] Implement `BaseScorer` ABC
+- [x] Implement `ScoreResult` dataclass
+- [x] Implement scorer registry with auto-registration via decorator
+- [x] Add `score_all(task, response, scorer_names)` helper that runs multiple scorers
 
 ### 4.2 Implement exact match scorer
 
@@ -104,9 +104,9 @@ scoring:
 ```
 
 **Actions:**
-- [ ] Implement scorer with whitespace normalization
-- [ ] Support `case_insensitive` option
-- [ ] Register with `@register_scorer` decorator
+- [x] Implement scorer with whitespace normalization
+- [x] Support `case_insensitive` option
+- [x] Register with `@register_scorer` decorator
 
 ### 4.3 Implement multiple-choice scorer
 
@@ -143,9 +143,9 @@ scoring:
 ```
 
 **Actions:**
-- [ ] Implement choice extraction logic with regex patterns
-- [ ] Support letter-only, parenthesized, and verbose answer formats
-- [ ] Add `details` with extracted answer and confidence
+- [x] Implement choice extraction logic with regex patterns
+- [x] Support letter-only, parenthesized, and verbose answer formats
+- [x] Add `details` with extracted answer and confidence
 
 ### 4.4 Implement regex scorer
 
@@ -182,10 +182,10 @@ scoring:
 ```
 
 **Actions:**
-- [ ] Implement pattern matching with `re.search()`
-- [ ] Support all three modes (all/any/none)
-- [ ] Return partial score as fraction of patterns matched
-- [ ] Include matched patterns in `details`
+- [x] Implement pattern matching with `re.search()`
+- [x] Support all three modes (all/any/none)
+- [x] Return partial score as fraction of patterns matched
+- [x] Include matched patterns in `details`
 
 ### 4.5 Implement JSON schema scorer
 
@@ -235,11 +235,11 @@ scoring:
 ```
 
 **Actions:**
-- [ ] Add `jsonschema` to `pyproject.toml` dependencies
-- [ ] Implement JSON extraction with all fallback strategies
-- [ ] Implement schema validation
-- [ ] Implement repair attempt with score penalty
-- [ ] Include validation errors in `details`
+- [x] Add `jsonschema` to `pyproject.toml` dependencies
+- [x] Implement JSON extraction with all fallback strategies
+- [x] Implement schema validation
+- [x] Implement repair attempt with score penalty
+- [x] Include validation errors in `details`
 
 ### 4.6 Implement contains scorer
 
@@ -276,9 +276,9 @@ scoring:
 ```
 
 **Actions:**
-- [ ] Implement substring matching
-- [ ] Support both positive and negative patterns
-- [ ] Compute composite score from presence/absence
+- [x] Implement substring matching
+- [x] Support both positive and negative patterns
+- [x] Compute composite score from presence/absence
 
 ### 4.7 Implement format compliance scorer
 
@@ -318,9 +318,9 @@ scoring:
 ```
 
 **Actions:**
-- [ ] Implement each format check as a callable
-- [ ] Support `format_checks` with arguments (e.g., `line_count_max: 10`)
-- [ ] Return per-check pass/fail in `details`
+- [x] Implement each format check as a callable
+- [x] Support `format_checks` with arguments (e.g., `line_count_max: 10`)
+- [x] Return per-check pass/fail in `details`
 
 ### 4.8 Wire scorers into runner
 
@@ -345,9 +345,9 @@ class RunResult:
 5. Store all results in `score_secondary`
 
 **Actions:**
-- [ ] Update `RunResult` with scoring fields
-- [ ] Update `CompletionRunner.run()` to invoke scorers
-- [ ] Handle scorer errors gracefully (log error, set score to `None`)
+- [x] Update `RunResult` with scoring fields
+- [x] Update `CompletionRunner.run()` to invoke scorers
+- [x] Handle scorer errors gracefully (log error, set score to `None`)
 
 ### 4.9 Update SQLite schema for scoring
 
@@ -381,10 +381,10 @@ CREATE TABLE score_details (
 - `get_scores(suite_id: str, model_alias: str) -> list[dict]` — retrieves scores with details
 
 **Actions:**
-- [ ] Implement schema migration
-- [ ] Add `score_details` table
-- [ ] Implement save/retrieve methods
-- [ ] Serialize `score_secondary` as JSON string in `runs` table
+- [x] Implement schema migration
+- [x] Add `score_details` table
+- [x] Implement save/retrieve methods
+- [x] Serialize `score_secondary` as JSON string in `runs` table
 
 ### 4.10 Update Markdown report with scoring
 
@@ -411,10 +411,10 @@ CREATE TABLE score_details (
 ```
 
 **Actions:**
-- [ ] Update summary table to include score column
-- [ ] Add per-task scoring table
-- [ ] Add format compliance summary
-- [ ] Compute pass/fail from `score_primary >= 0.95` (configurable threshold)
+- [x] Update summary table to include score column
+- [x] Add per-task scoring table
+- [x] Add format compliance summary
+- [x] Compute pass/fail from `score_primary >= 0.95` (configurable threshold)
 
 ### 4.11 Define scorer configuration
 
@@ -449,9 +449,9 @@ scorers:
 ```
 
 **Actions:**
-- [ ] Write scorers.yaml with all scorer configurations
-- [ ] Load scorer config in `config.py`
-- [ ] Pass scorer config to scorer constructors
+- [x] Write scorers.yaml with all scorer configurations
+- [x] Load scorer config in `config.py`
+- [x] Pass scorer config to scorer constructors
 
 ### 4.12 Add scorer unit tests
 
@@ -481,9 +481,9 @@ scorers:
 - `test_score_result_serialization` — ScoreResult fields serialize correctly
 
 **Actions:**
-- [ ] Implement all tests with pytest
-- [ ] Use parametrized tests for multiple input variants
-- [ ] Ensure tests are deterministic (no network, no randomness)
+- [x] Implement all tests with pytest
+- [x] Use parametrized tests for multiple input variants
+- [x] Ensure tests are deterministic (no network, no randomness)
 
 ### 4.13 Note on IFEval integration
 
@@ -502,13 +502,13 @@ This avoids duplicating IFEval's task definitions while keeping results in a uni
 
 ## Acceptance Criteria Checklist
 
-- [ ] All six scorers (exact_match, multiple_choice, regex, json_schema, contains, format_compliance) are implemented and registered
-- [ ] Smoke tasks produce real scores with all configured scorers
-- [ ] Format failures are visible in the Markdown report
-- [ ] Scorers are deterministic and fully tested
-- [ ] Score results are stored in SQLite with details
-- [ ] Runner invokes scorers automatically based on task YAML scoring config
-- [ ] `pytest tests/test_scorers.py` passes with 100% coverage on scorer modules
+- [x] All six scorers (exact_match, multiple_choice, regex, json_schema, contains, format_compliance) are implemented and registered
+- [x] Smoke tasks produce real scores with all configured scorers
+- [x] Format failures are visible in the Markdown report
+- [x] Scorers are deterministic and fully tested
+- [x] Score results are stored in SQLite with details
+- [x] Runner invokes scorers automatically based on task YAML scoring config
+- [x] `pytest tests/test_scorers.py` passes with 100% coverage on scorer modules
 
 ## Estimated Effort
 
@@ -518,16 +518,16 @@ This avoids duplicating IFEval's task definitions while keeping results in a uni
 
 | File | Status |
 |---|---|
-| `src/bench_harness/scorers/base.py` | To create |
-| `src/bench_harness/scorers/exact_match.py` | To create |
-| `src/bench_harness/scorers/multiple_choice.py` | To create |
-| `src/bench_harness/scorers/regex.py` | To create |
-| `src/bench_harness/scorers/json_schema.py` | To create |
-| `src/bench_harness/scorers/contains.py` | To create |
-| `src/bench_harness/scorers/format_compliance.py` | To create |
+| `src/bench_harness/scorers/base.py` | Done |
+| `src/bench_harness/scorers/exact_match.py` | Done |
+| `src/bench_harness/scorers/multiple_choice.py` | Done |
+| `src/bench_harness/scorers/regex.py` | Done |
+| `src/bench_harness/scorers/json_schema.py` | Done |
+| `src/bench_harness/scorers/contains.py` | Done |
+| `src/bench_harness/scorers/format_compliance.py` | Done |
 | `configs/scorers.yaml` | Update (full config) |
 | `src/bench_harness/runners/completion_runner.py` | Update (score integration) |
 | `src/bench_harness/storage/sqlite.py` | Update (score schema migration) |
 | `src/bench_harness/reports/markdown.py` | Update (score report sections) |
 | `src/bench_harness/config.py` | Update (load scorer config) |
-| `tests/test_scorers.py` | To create |
+| `tests/test_scorers.py` | Done |

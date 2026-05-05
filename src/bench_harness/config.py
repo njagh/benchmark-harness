@@ -104,3 +104,10 @@ def resolve_task_dir(suite_name: str) -> Path:
     if not task_dir.exists():
         raise FileNotFoundError(f"Task directory not found: {task_dir}")
     return task_dir
+
+
+def load_scorer_config(path: str | None = None) -> dict[str, Any]:
+    """Load and return configs/scorers.yaml."""
+    config_path = path or "scorers.yaml"
+    data = load_yaml(config_path)
+    return data

@@ -58,7 +58,7 @@ def generate_report(
     # Summary table
     lines.append(f"## Summary")
     lines.append(f"")
-    lines.append(f"| Model | Tasks Run | Passed | Failed | Avg TTFT (ms) | Avg Tok/s |")
+    lines.append(f"| Model | Tasks Run | Passed | Failed | Avg Score | Avg TTFT (ms) |")
     lines.append(f"|---|---|---|---|---|---|")
 
     # Group by model
@@ -73,6 +73,7 @@ def generate_report(
         total = len(model_runs)
         passed = sum(1 for r in model_runs if r.get("exit_status") == "success")
         failed = total - passed
+        avg_score = sum(r.get("score_primary", 0) or 0 for r in model_runs) / max(total, 1)
         avg_ttft = sum(r.get("ttft_ms", 0) for r in model_runs) / max(total, 1)
         tps_vals = []
         for r in model_runs:
@@ -82,7 +83,7 @@ def generate_report(
                 tps_vals.append(comp / (wall / 1000.0))
         avg_tps = sum(tps_vals) / max(len(tps_vals), 1) if tps_vals else 0
         lines.append(
-            f"| {alias} | {total} | {passed} | {failed} | {avg_ttft:.0f} | {avg_tps:.1f} |"
+            f"| {alias} | {total} | {passed} | {failed} | {avg_score:.3f} | {avg_ttft:.0f} | {avg_tps:.1f} |"
         )
 
     lines.append(f"")
@@ -160,6 +161,49 @@ def generate_report(
         lines.append(f"| {rank} | {task_id} | {alias} | {wall:.0f} | {tokens} |")
 
     lines.append(f"")
+
+    # Scoring Summary
+    scored_runs = [r for r in runs if r.get("score_primary") is not None]
+    if scored_runs:
+        lines.append(f"## Scoring Summary")
+        lines.append(f"")
+        lines.append(f"| Model | Avg Primary Score | Tasks Scored | Format Failures |")
+        lines.append(f"|---|---|---|---|")
+
+        scored_by_model: dict[str, list[dict]] = {}
+        for r in scored_runs:
+            alias = r.get("model_alias", "unknown")
+            if alias not in scored_by_model:
+                scored_by_model[alias] = []
+            scored_by_model[alias].append(r)
+
+        for alias, model_runs in sorted(scored_by_model.items()):
+            avg_score = sum(r.get("score_primary", 0) or 0 for r in model_runs) / max(len(model_runs), 1)
+            lines.append(f"| {alias} | {avg_score:.3f} | {len(model_runs)} | - |")
+
+        lines.append(f"")
+
+        # Per-task scoring
+        lines.append(f"## Per-Task Scores")
+        lines.append(f"")
+        lines.append(f"| Task | Model | Primary Score | Secondary Scores | Explanation |")
+        lines.append(f"|---|---|---|---|---|")
+
+        for r in scored_runs:
+            task_id = r.get("task_id", "unknown")
+            alias = r.get("model_alias", "unknown")
+            primary = r.get("score_primary", 0)
+            sec_scores = r.get("score_secondary", {})
+            sec_str = ", ".join(
+                f"{k}={v.get('score', '?')}"
+                for k, v in (sec_scores or {}).items()
+            ) or "-"
+            explanation = (r.get("score_explanation") or "").replace("\n", " ")
+            lines.append(
+                f"| {task_id} | {alias} | {primary:.3f} | {sec_str} | {explanation[:80]} |"
+            )
+
+        lines.append(f"")
 
     # Raw output excerpts for failed tasks
     failures = [r for r in runs if r.get("exit_status") == "error"]
