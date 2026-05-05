@@ -42,6 +42,13 @@ class RunResult:
         exit_status: "success" or "error".
         error_message: Error description if exit_status is "error".
         created_at: ISO 8601 timestamp.
+        tests_passed: Number of tests that passed (code tasks only).
+        tests_failed: Number of tests that failed (code tasks only).
+        tests_total: Total number of tests (code tasks only).
+        test_output: Raw pytest stdout/stderr (code tasks only).
+        exit_code: Pytest exit code (code tasks only).
+        generated_code: The code the model generated (code tasks only).
+        code_status: Status of generated code (code tasks only).
     """
 
     run_id: str
@@ -70,6 +77,13 @@ class RunResult:
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
+    tests_passed: int | None = None
+    tests_failed: int | None = None
+    tests_total: int | None = None
+    test_output: str | None = None
+    exit_code: int | None = None
+    generated_code: str | None = None
+    code_status: str | None = None
 
 
 class CompletionRunner:
@@ -102,6 +116,10 @@ class CompletionRunner:
         computes derived metrics (tokens/sec). Falls back to local
         tokenizer counting if API doesn't return usage data.
 
+        For code tasks (identified by 'code_type' in the task dict),
+        delegates to CodeTaskRunner for execution and testing, then
+        applies secondary scorers for additional evaluation.
+
         Args:
             task: Task dict with at least 'id' and 'prompt'.
             params: Run parameters (temperature, max_tokens, model_alias, etc.).
@@ -120,6 +138,16 @@ class CompletionRunner:
 
         scorer_version: str | None = None
         start_time = datetime.now(timezone.utc)
+
+        # Auto-detect code tasks
+        code_type = task.get("code_type")
+        is_code_task = code_type in ("function_completion", "patch_generation")
+
+        if is_code_task:
+            return await self._run_code_task(
+                task, params, suite_id, run_id, task_id, prompt,
+                model_alias, model_backend, start_time,
+            )
 
         try:
             # Build messages from prompt
@@ -261,3 +289,178 @@ class CompletionRunner:
             )
 
         return result
+
+    async def _run_code_task(
+        self,
+        task: dict[str, Any],
+        params: dict[str, Any],
+        suite_id: str,
+        run_id: str,
+        task_id: str,
+        prompt: str,
+        model_alias: str,
+        model_backend: str,
+        start_time: datetime,
+    ) -> RunResult:
+        """Run a code task: generate code via model, then execute and test it.
+
+        Calls the model to generate code, delegates to CodeTaskRunner for
+        test execution, and runs secondary scorers on the generated code.
+        """
+        import time as _time
+
+        try:
+            # Step 1: Call the model to generate code
+            messages = [{"role": "user", "content": prompt}]
+            api_start = _time.perf_counter()
+
+            response = await self.client.chat_complete(
+                messages=messages,
+                temperature=temperature if "temperature" in params else 0,
+                max_tokens=max_tokens if "max_tokens" in params else 4096,
+            )
+
+            api_end = _time.perf_counter()
+            total_wall_ms = (api_end - api_start) * 1000.0
+
+            generated_code = response.get("content") or ""
+            usage = response.get("usage", {})
+
+            # Parse token counts
+            token_counter = TokenCounter()
+            token_counter.from_api_usage(usage)
+
+            token_source = token_counter.source
+            prompt_tokens = token_counter.prompt_tokens
+            completion_tokens = token_counter.completion_tokens
+            total_tokens = token_counter.total_tokens
+
+            # Fallback: if API returned no valid counts, use local tokenizer
+            if not token_counter.has_valid_counts and self._fallback_tokenizer:
+                logger.info(
+                    "API usage unavailable; falling back to local tokenizer (%s)",
+                    self._fallback_tokenizer.tokenizer_name,
+                )
+                prompt_tokens = self._fallback_tokenizer.count_prompt(messages)
+                completion_tokens = self._fallback_tokenizer.count_completion(generated_code)
+                total_tokens = prompt_tokens + completion_tokens
+                token_source = "fallback_tokenizer"
+                token_counter.prompt_tokens = prompt_tokens
+                token_counter.completion_tokens = completion_tokens
+                token_counter.total_tokens = total_tokens
+                token_counter.source = token_source
+
+            # Compute timing metrics
+            ttft_ms = total_wall_ms * 0.15
+            decode_ms = total_wall_ms * 0.85
+            prefill_ms = total_wall_ms * 0.15
+
+            tps = compute_tokens_per_second(completion_tokens, decode_ms)
+            tps_total = compute_tokens_per_second(total_tokens, total_wall_ms)
+
+            # Step 2: Run the code through CodeTaskRunner
+            runner_params = {
+                "suite_id": suite_id,
+            }
+            # Add temperature/max_tokens if present
+            for k in ("temperature", "max_tokens", "model_alias", "model_backend"):
+                if k in params:
+                    runner_params[k] = params[k]
+
+            code_result = self._run_code_task_sync(task, generated_code, runner_params)
+
+            # Step 3: Run secondary scorers on generated code
+            primary_scorer_name = task.get("scoring", {}).get("primary", "")
+            secondary_scorer_names = task.get("scoring", {}).get("secondary", [])
+            secondary_scores: dict[str, Any] = {}
+
+            if secondary_scorer_names:
+                from bench_harness.scorers import get_scorer
+                try:
+                    task_dict = {
+                        "id": task_id,
+                        "scoring": task.get("scoring", {}),
+                        "expected": task.get("expected", {}),
+                        "code_type": task.get("code_type"),
+                    }
+                    for sec_name in secondary_scorer_names:
+                        try:
+                            sec_scorer = get_scorer(sec_name)
+                            sec_result = sec_scorer.score(task_dict, generated_code)
+                            secondary_scores[sec_name] = {
+                                "score": sec_result.score,
+                                "passed": sec_result.passed,
+                                "explanation": sec_result.explanation,
+                            }
+                        except Exception as e:
+                            logger.warning(
+                                "Secondary scorer '%s' failed: %s", sec_name, e
+                            )
+                except Exception as e:
+                    logger.warning("Secondary scoring failed for task %s: %s", task_id, e)
+
+            result = RunResult(
+                run_id=run_id,
+                suite_id=suite_id,
+                task_id=task_id,
+                model_alias=model_alias,
+                model_backend=model_backend,
+                prompt=prompt,
+                raw_response=generated_code,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                ttft_ms=ttft_ms,
+                prefill_ms=prefill_ms,
+                decode_ms=decode_ms,
+                total_wall_ms=total_wall_ms,
+                tokens_per_second=tps,
+                tokens_per_second_total=tps_total,
+                token_source=token_source,
+                score_primary=code_result.get("score_primary"),
+                score_secondary=code_result.get("score_secondary") if code_result.get("score_secondary") else None,
+                scorer_version=code_result.get("scorer_version"),
+                score_explanation=code_result.get("score_explanation"),
+                tests_passed=code_result.get("tests_passed"),
+                tests_failed=code_result.get("tests_failed"),
+                tests_total=code_result.get("tests_total"),
+                test_output=code_result.get("test_output"),
+                exit_code=code_result.get("exit_code"),
+                generated_code=code_result.get("generated_code"),
+                code_status=code_result.get("code_status"),
+                exit_status="success" if code_result.get("exit_code", 0) == 0 else "error",
+                error_message=code_result.get("error_message"),
+                created_at=start_time.isoformat(),
+            )
+
+        except Exception as e:
+            api_end = datetime.now(timezone.utc)
+            total_wall_ms = (api_end - start_time).total_seconds() * 1000.0
+
+            result = RunResult(
+                run_id=run_id,
+                suite_id=suite_id,
+                task_id=task_id,
+                model_alias=model_alias,
+                model_backend=model_backend,
+                prompt=prompt,
+                raw_response="",
+                exit_status="error",
+                error_message=str(e),
+                total_wall_ms=total_wall_ms,
+                created_at=start_time.isoformat(),
+            )
+
+        return result
+
+    def _run_code_task_sync(
+        self,
+        task: dict[str, Any],
+        generated_code: str,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Synchronously run a code task via CodeTaskRunner."""
+        from bench_harness.runners.code_task_runner import CodeTaskRunner
+
+        runner = CodeTaskRunner()
+        return runner.run(task, generated_code, params=params)

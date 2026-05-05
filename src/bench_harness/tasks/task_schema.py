@@ -37,6 +37,10 @@ class TaskExpected(BaseModel):
         test_files: Paths to test files for code tasks.
         format_checks: Format validation checks (for format_compliance scorer).
         choices: Multiple choice options (for multiple_choice scorer).
+        function_signature: Expected function signature for code tasks.
+        entry_point: Function/class name to use as the test entry point.
+        test_framework: Testing framework (pytest, unittest, etc.).
+        test_code: Inline test code to use for evaluation.
     """
 
     type: str = Field(description="Scoring type identifier.")
@@ -62,6 +66,21 @@ class TaskExpected(BaseModel):
     )
     choices: dict[str, str] | None = Field(
         default=None, description="Multiple choice options (multiple_choice scorer)."
+    )
+    function_signature: str | None = Field(
+        default=None, description="Expected function signature for code tasks."
+    )
+    entry_point: str | None = Field(
+        default=None,
+        description="Function or class name used as the test entry point.",
+    )
+    test_framework: str | None = Field(
+        default="pytest",
+        description="Testing framework to use for code evaluation (pytest, unittest).",
+    )
+    test_code: str | None = Field(
+        default=None,
+        description="Inline test code to use for evaluation.",
     )
 
 
@@ -134,6 +153,10 @@ class Task(BaseModel):
     )
     allowed_commands: list[str] | None = Field(
         default=None, description="Optional list of allowed shell commands."
+    )
+    code_type: str | None = Field(
+        default=None,
+        description="Code task type: function_completion or patch_generation.",
     )
     metadata: dict[str, Any] | None = Field(
         default=None, description="Freeform extra fields."

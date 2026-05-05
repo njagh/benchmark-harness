@@ -1,0 +1,18 @@
+id: smoke.code_list_001
+family: coding
+prompt: |
+  Write a Python function `find_max(lst)` that returns the maximum value in a list.
+expected:
+  type: unit_test
+  test_code: |
+    assert find_max([1, 2, 3]) == 3
+    assert find_max([-1, -2]) == -1
+  entry_point: find_max
+  test_framework: pytest
+  patterns:
+    - "def find_max"
+scoring:
+  primary: unit_test
+  secondary:
+    - format_compliance
+code_type: function_completion

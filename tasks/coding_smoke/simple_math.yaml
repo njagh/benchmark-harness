@@ -1,0 +1,19 @@
+id: smoke.code_math_001
+family: coding
+prompt: |
+  Write a Python function `plus(a, b)` that returns the sum of two numbers.
+expected:
+  type: unit_test
+  test_code: |
+    assert plus(1, 2) == 3
+    assert plus(0, 0) == 0
+    assert plus(-1, 1) == 0
+  entry_point: plus
+  test_framework: pytest
+  patterns:
+    - "def plus"
+scoring:
+  primary: unit_test
+  secondary:
+    - format_compliance
+code_type: function_completion

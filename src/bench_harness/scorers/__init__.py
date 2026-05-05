@@ -16,6 +16,7 @@ from bench_harness.scorers import regex
 from bench_harness.scorers import json_schema
 from bench_harness.scorers import contains
 from bench_harness.scorers import format_compliance
+from bench_harness.scorers import unit_test
 
 __all__ = [
     "BaseScorer",
@@ -30,4 +31,5 @@ __all__ = [
     "json_schema",
     "contains",
     "format_compliance",
+    "unit_test",
 ]

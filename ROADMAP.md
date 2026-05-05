@@ -1090,28 +1090,34 @@ Support automatic deterministic scoring for simple tasks: exact match, multiple-
 
 ---
 
-# Milestone 5 — Coding task runner
+# Milestone 5 — Coding task runner **✅ DONE**
 
 ## Goal
 
-Evaluate code outputs using executable tests.
+Evaluate code outputs using executable tests in isolated temp directories.
 
 ## Tasks
 
-* Define code task format.
-* Support function-completion tasks.
-* Support patch-generation tasks.
-* Run tests in isolated temp directories.
-* Capture stdout/stderr.
-* Detect patch apply failure.
-* Detect unrelated file changes.
-* Store artifacts.
+* [x] Define code task format (`code_type: "function_completion" | "patch_generation"`, `entry_point`, `test_framework`, `test_code`).
+* [x] Support function-completion tasks — write generated code + test code to temp dir, run pytest.
+* [x] Support patch-generation tasks — write context files + patch diff, `git apply --check` + `git apply`, run tests.
+* [x] Run tests in isolated temp directories with subprocess-based pytest execution.
+* [x] Capture stdout/stderr from pytest execution.
+* [x] Detect patch apply failure via `git apply --check`.
+* [x] Detect unrelated file changes via `git diff --name-only` vs expected `test_files`.
+* [x] Store artifacts: generated_code.py, test_generated.py, test_output.txt, patch.diff.
+* [x] Wire `CodeTaskRunner` into `CompletionRunner` — auto-detect via `code_type` field.
+* [x] Add `unit_test` scorer for code task scoring.
+* [x] Extend `RunResult` with code-specific fields: `tests_passed`, `tests_failed`, `tests_total`, `test_output`, `exit_code`, `generated_code`, `code_status`.
+* [x] Extend artifact output with code fields in JSONL.
 
 ## Acceptance criteria
 
-* Can run HumanEval/MBPP-style local tasks.
-* Can score pass/fail from unit tests.
-* Raw generated code and test logs are saved.
+* [x] Can run HumanEval/MBPP-style local tasks with real test execution.
+* [x] Can score pass/fail from unit tests (fraction of tests passed).
+* [x] Raw generated code, test code, and test logs are saved as artifacts.
+* [x] 4 coding smoke tasks (simple_math, string_ops, list_utils, bugfix_simple) all execute successfully.
+* [x] `pytest tests/test_code_task_runner.py` passes with full coverage on code runner modules.
 
 ---
 

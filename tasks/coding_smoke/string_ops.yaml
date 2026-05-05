@@ -1,0 +1,18 @@
+id: smoke.code_string_001
+family: coding
+prompt: |
+  Write a Python function `reverse_string(s)` that returns the reversed string.
+expected:
+  type: unit_test
+  test_code: |
+    assert reverse_string("hello") == "olleh"
+    assert reverse_string("") == ""
+  entry_point: reverse_string
+  test_framework: pytest
+  patterns:
+    - "def reverse_string"
+scoring:
+  primary: unit_test
+  secondary:
+    - format_compliance
+code_type: function_completion

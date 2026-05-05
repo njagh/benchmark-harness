@@ -48,6 +48,21 @@ def save_run_artifact(result: RunResult, out_dir: str) -> Path:
         "created_at": result.created_at,
     }
 
+    if result.generated_code is not None:
+        record["generated_code"] = result.generated_code
+    if result.code_status is not None:
+        record["code_status"] = result.code_status
+    if result.tests_passed is not None:
+        record["tests_passed"] = result.tests_passed
+    if result.tests_failed is not None:
+        record["tests_failed"] = result.tests_failed
+    if result.tests_total is not None:
+        record["tests_total"] = result.tests_total
+    if result.test_output is not None:
+        record["test_output"] = result.test_output
+    if result.exit_code is not None:
+        record["exit_code"] = result.exit_code
+
     with open(artifact_path, "a") as f:
         f.write(json.dumps(record, default=str) + "\n")
 

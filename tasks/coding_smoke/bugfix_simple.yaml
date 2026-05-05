@@ -1,0 +1,19 @@
+id: smoke.code_patch_001
+family: coding
+prompt: |
+  Fix the bug in this function: `def subtract(a, b): return a - b` — it should subtract b from a but the implementation uses subtraction instead of addition for a use case where addition is needed.
+expected:
+  type: unit_test
+  test_code: |
+    assert add(1, 2) == 3
+    assert add(0, 0) == 0
+    assert add(-1, 1) == 0
+  entry_point: add
+  test_framework: pytest
+  patterns:
+    - "def add"
+scoring:
+  primary: unit_test
+  secondary:
+    - format_compliance
+code_type: patch_generation
