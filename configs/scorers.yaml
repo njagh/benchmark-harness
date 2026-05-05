@@ -1,0 +1,30 @@
+# Scorer definitions — which scorer classes are available and their defaults.
+# Scorers are implemented in src/bench_harness/scorers/
+
+scorers:
+  exact_match:
+    class: ExactMatchScorer
+    description: "Exact string match on response"
+    case_sensitive: false
+    strip_whitespace: true
+
+  regex:
+    class: RegexScorer
+    description: "Regex pattern match on response"
+    flag: re.IGNORECASE
+
+  json_schema:
+    class: JsonSchemaScorer
+    description: "Validate response against JSON schema"
+
+  contains:
+    class: ContainsScorer
+    description: "Check if response contains expected patterns"
+
+  multiple_choice:
+    class: MultipleChoiceScorer
+    description: "Score multiple choice answers"
+
+  rubric:
+    class: RubricScorer
+    description: "Score against multi-dimensional rubric"

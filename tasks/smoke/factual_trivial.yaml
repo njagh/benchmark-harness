@@ -1,0 +1,8 @@
+id: smoke.factual_001
+family: general
+prompt: "What is the capital of France? Answer in one word."
+expected:
+  type: exact
+  answer: "Paris"
+scoring:
+  primary: exact_match

@@ -1,0 +1,18 @@
+suites:
+  smoke:
+    description: "Verify harness and model endpoint work"
+    task_dir: "tasks/smoke"
+    families: null
+    max_concurrency: 4
+    default_runs: 1
+    default_temperature: 0
+
+  coding_smoke:
+    description: "Fast coding quality regression"
+    task_dir: "tasks/coding_smoke"
+    families:
+      - coding
+      - debugging
+    max_concurrency: 2
+    default_runs: 1
+    default_temperature: 0

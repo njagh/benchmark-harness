@@ -1,0 +1,13 @@
+id: smoke.debug_001
+family: debugging
+prompt: |
+  This Python code has a bug:
+    def add(a, b):
+      return a - b
+  What is the bug and how do you fix it?
+expected:
+  type: contains
+  patterns:
+    - "a + b"
+scoring:
+  primary: regex

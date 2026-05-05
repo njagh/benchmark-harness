@@ -1,0 +1,12 @@
+id: smoke.instruction_001
+family: instruction_following
+prompt: |
+  List exactly three benefits of unit testing. Use a numbered list.
+  Do not write any other text.
+expected:
+  type: format
+  checks:
+    - starts_with_numbered_list
+    - exactly_three_items
+scoring:
+  primary: regex

@@ -1,0 +1,11 @@
+id: smoke.python_001
+family: coding
+prompt: |
+  Write a Python function called fibonacci(n) that returns the nth
+  Fibonacci number. n is a non-negative integer.
+expected:
+  type: contains
+  patterns:
+    - "def fibonacci"
+scoring:
+  primary: regex
