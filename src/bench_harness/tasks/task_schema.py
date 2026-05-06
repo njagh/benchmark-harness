@@ -155,6 +155,10 @@ class Task(BaseModel):
         default="small",
         description="Approximate context size: small, medium, large, xlarge.",
     )
+    estimated_prompt_tokens: int | None = Field(
+        default=None,
+        description="Estimated token count of the prompt before API call.",
+    )
     allowed_commands: list[str] | None = Field(
         default=None, description="Optional list of allowed shell commands."
     )

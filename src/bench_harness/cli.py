@@ -14,6 +14,7 @@ from rich.console import Console
 from bench_harness.config import (
     load_model_config,
     get_model,
+    get_quantization,
     load_suite_config,
     resolve_task_dir,
     load_judge_config,
@@ -21,6 +22,7 @@ from bench_harness.config import (
 from bench_harness.models.openai_client import OpenAICompatClient
 from bench_harness.runners.completion_runner import CompletionRunner
 from bench_harness.runners.style_sweep_runner import StyleSweepRunner
+from bench_harness.runners.context_sweep_runner import ContextSizeSweepRunner
 from bench_harness.tasks.loaders import load_tasks
 from bench_harness.tasks.registry import TaskRegistry
 from bench_harness.storage.sqlite import SQLiteStore
@@ -47,10 +49,14 @@ def run(
     max_tokens: int = typer.Option(4096, "--max-tokens", help="Max output tokens"),
     runs: int = typer.Option(1, "--runs", help="Number of repetitions per task"),
     styles: str = typer.Option("plain", "--styles", help="Comma-separated list of prompt styles (default: plain)"),
+    context_sizes: str = typer.Option("small", "--context-sizes", help="Comma-separated list of context sizes (small,medium,large,xlarge)"),
     out: str | None = typer.Option(None, "--out", help="Output directory"),
     timing_detail: bool = typer.Option(False, "--timing-detail", help="Show per-task timing in CLI output"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print tasks without executing"),
     judge: bool = typer.Option(False, "--judge", help="Run LLM judge scorer on scored tasks"),
+    report_v2: bool = typer.Option(False, "--report-v2", help="Use v2 modular report format"),
+    sections: str = typer.Option("", "--sections", help="Comma-separated list of report sections to include (v2 only)"),
+    prior_runs: str = typer.Option(None, "--prior-runs", help="Path to prior run results JSONL for regression detection"),
 ):
     """Run benchmark suite against one or more models."""
     suite_names = [s.strip() for s in suite.split(",")]
@@ -114,6 +120,7 @@ def run(
 
     # Run
     style_list = [s.strip() for s in styles.split(",")]
+    context_size_list = [s.strip() for s in context_sizes.split(",")]
     all_results = []
 
     for alias in model_aliases:
@@ -131,11 +138,13 @@ def run(
         client = OpenAICompatClient(base_url=url, model=model_name)
         runner = CompletionRunner(client)
 
+        quant = get_quantization(model_config, alias)
         params = {
             "model_alias": alias,
             "model_backend": backend,
             "temperature": temperature,
             "max_tokens": max_tokens,
+            "quantization": quant,
         }
 
         for task in tasks:
@@ -144,6 +153,48 @@ def run(
                     f"  [dim]{task.get('id')} (run {run_num}/{runs})[/dim]"
                 )
 
+                # Context sweep mode (overrides single-style path when sizes > 1)
+                if len(context_size_list) > 1:
+                    context_params = {
+                        "model_alias": alias,
+                        "model_backend": backend,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                    }
+                    sweep = ContextSizeSweepRunner(runner, sizes=context_size_list)
+                    sweep_results = asyncio.run(
+                        sweep.run_sweep([task], [alias], context_params, suite_id=suite_id)
+                    )
+                    for result in sweep_results:
+                        all_results.append(result)
+                        store.save_run(result)
+                        save_run_artifact(result, str(out_path))
+
+                        if result.exit_status == "error":
+                            console.print(
+                                f"  [red]  [context={result.context_tokens}] Error:[/red] {result.error_message}"
+                            )
+                        else:
+                            if timing_detail:
+                                tps_str = (
+                                    f"{result.tokens_per_second:.1f}"
+                                    if result.tokens_per_second > 0
+                                    else "N/A"
+                                )
+                                console.print(
+                                    f"  [green]  [context={result.context_tokens}] TTFT: {result.ttft_ms:.0f}ms[/green] "
+                                    f"[green]Decode: {result.decode_ms:.0f}ms[/green] "
+                                    f"[green]Wall: {result.total_wall_ms:.0f}ms[/green] "
+                                    f"[dim]{result.prompt_tokens}p + {result.completion_tokens}c tokens[/dim] "
+                                    f"[dim]{tps_str} tok/s[/dim]"
+                                )
+                            else:
+                                console.print(
+                                    f"  [green]  [context={result.context_tokens}] Wall: {result.total_wall_ms:.0f}ms[/green] "
+                                    f"[dim]{result.total_tokens} tokens[/dim]"
+                                )
+                    continue
+
                 if len(style_list) > 1:
                     # Multi-style sweep
                     style_params = {
@@ -151,6 +202,7 @@ def run(
                         "model_backend": backend,
                         "temperature": temperature,
                         "max_tokens": max_tokens,
+                        "quantization": quant,
                     }
                     sweep = StyleSweepRunner(runner, styles=style_list)
                     sweep_results = asyncio.run(
@@ -219,9 +271,32 @@ def run(
                                 f"[dim]{result.total_tokens} tokens[/dim]"
                             )
 
+    # Parse sections if specified
+    section_list = None
+    if sections:
+        section_list = [s.strip() for s in sections.split(",") if s.strip()]
+
+    # Load prior runs for regression detection
+    prior_run_list: list[dict] | None = None
+    if prior_runs:
+        prior_path = Path(prior_runs)
+        if prior_path.exists():
+            import json
+            with open(prior_path, "r") as f:
+                prior_run_list = json.load(f)
+            logger.info("Loaded %d prior runs for regression detection", len(prior_run_list))
+
     # Generate report
     runs_list = store.get_runs(suite_id=suite_id)
-    report_md = generate_report(runs_list, suite_id, model_config, str(out_path / "report.md"))
+    report_md = generate_report(
+        runs_list,
+        suite_id,
+        model_config,
+        str(out_path / "report.md"),
+        v2=report_v2,
+        sections=section_list,
+        prior_runs=prior_run_list,
+    )
 
     # Print style comparison summary when multiple styles are used
     if len(style_list) > 1:
@@ -248,6 +323,32 @@ def run(
                         f"wall={avg_wall:.0f}ms "
                         f"tokens={avg_tokens:.0f} "
                         f"passed={passed}/{len(style_runs)}"
+                    )
+
+    # Print context sweep summary when multiple sizes are used
+    if len(context_size_list) > 1:
+        console.print(f"\n[yellow]=== Context Size Sweep ({', '.join(context_size_list)}) ===[/yellow]")
+        from collections import defaultdict
+        task_size_results: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+        for run in runs_list:
+            tid = run.get("task_id", "unknown")
+            cs = run.get("context_tokens", "small")
+            task_size_results[tid][cs].append(run)
+
+        for tid in sorted(task_size_results.keys()):
+            sizes_for_task = task_size_results[tid]
+            console.print(f"\n  [cyan]{tid}[/cyan]")
+            for size in context_size_list:
+                size_runs = sizes_for_task.get(size, [])
+                if size_runs:
+                    avg_wall = sum(r.get("total_wall_ms", 0) for r in size_runs) / len(size_runs)
+                    avg_tokens = sum(r.get("total_tokens", 0) for r in size_runs) / len(size_runs)
+                    passed = sum(1 for r in size_runs if r.get("score_primary") and r["score_primary"] > 0)
+                    console.print(
+                        f"    [dim]{size}[/dim]: "
+                        f"wall={avg_wall:.0f}ms "
+                        f"tokens={avg_tokens:.0f} "
+                        f"passed={passed}/{len(size_runs)}"
                     )
 
     # Print summary

@@ -1,0 +1,19 @@
+id: quant.code_generation_001
+family: code_generation
+prompt: |
+  Write a Python function called `find_missing_number` that takes a list of
+  unique integers from 0 to N (where N is the length of the list minus 1),
+  with exactly one number missing, and returns the missing number.
+
+  Do not use any external libraries. Include a docstring and type hints.
+
+  Example input: [3, 0, 1]  -> returns 2
+  Example input: [0, 1]     -> returns 2
+expected:
+  type: contains
+  patterns:
+    - "def find_missing_number"
+    - "->"
+    - "int"
+scoring:
+  primary: contains

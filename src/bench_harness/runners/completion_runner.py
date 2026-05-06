@@ -107,6 +107,9 @@ class RunResult:
     human_score: float | None = None
     human_note: str | None = None
     prompt_style: str | None = None  # The prompt style used for this run
+    context_tokens: str | None = None  # Context size bucket
+    estimated_prompt_tokens: int | None = None  # Estimated prompt token count
+    quantization: str | None = None  # Model quantization (e.g., "FP8", "GPTQ-Int4", "FP16")
 
 
 def build_messages(task: dict, prompt: str) -> list[dict]:
@@ -172,6 +175,8 @@ class CompletionRunner:
         model_backend = params.get("model_backend", "")
         temperature = params.get("temperature", 0)
         max_tokens = params.get("max_tokens", 4096)
+        context_tokens = params.get("context_tokens", task.get("context_tokens", "small"))
+        estimated_prompt_tokens = params.get("estimated_prompt_tokens")
 
         scorer_version: str | None = None
         start_time = datetime.now(timezone.utc)
@@ -321,6 +326,8 @@ class CompletionRunner:
                 validation_command=validation_command,
                 validation_output=validation_output,
                 prompt_style=params.get("prompt_style"),
+                context_tokens=context_tokens,
+                estimated_prompt_tokens=estimated_prompt_tokens,
             )
 
         except Exception as e:
@@ -340,6 +347,8 @@ class CompletionRunner:
                 total_wall_ms=total_wall_ms,
                 created_at=start_time.isoformat(),
                 prompt_style=params.get("prompt_style"),
+                context_tokens=context_tokens,
+                estimated_prompt_tokens=estimated_prompt_tokens,
             )
 
         return result
@@ -486,6 +495,8 @@ class CompletionRunner:
                 error_message=code_result.get("error_message"),
                 created_at=start_time.isoformat(),
                 prompt_style=params.get("prompt_style"),
+                context_tokens=context_tokens,
+                estimated_prompt_tokens=estimated_prompt_tokens,
             )
 
         except Exception as e:
@@ -505,6 +516,7 @@ class CompletionRunner:
                 total_wall_ms=total_wall_ms,
                 created_at=start_time.isoformat(),
                 prompt_style=params.get("prompt_style"),
+                quantization=quantization,
             )
 
         return result

@@ -55,6 +55,27 @@ def get_model(config: dict[str, Any], alias: str) -> dict[str, Any] | None:
     return models.get(alias)
 
 
+def get_quantization(model_config: dict[str, Any] | None, alias: str) -> str | None:
+    """Get the quantization label for a model from its config.
+
+    Args:
+        model_config: Full model config dict (from load_model_config).
+        alias: Model alias to look up.
+
+    Returns:
+        Quantization string (e.g., "FP8", "GPTQ-Int4") or None if not set.
+    """
+    if model_config is None:
+        try:
+            model_config = load_model_config()
+        except FileNotFoundError:
+            return None
+    model = get_model(model_config, alias)
+    if model is None:
+        return None
+    return model.get("quantization")
+
+
 def load_suite_config(path: str | None = None) -> dict[str, Any]:
     """Load and return configs/suites.yaml."""
     config_path = path or "suites.yaml"
@@ -170,3 +191,26 @@ def get_rubric(rubric_name: str) -> dict[str, Any] | None:
         return rubrics if rubric_name == "default" else None
     except FileNotFoundError:
         return None
+
+
+CONTEXT_BUDGETS: dict[str, int] = {
+    "small": 1024,
+    "medium": 4096,
+    "large": 16384,
+    "xlarge": 65536,
+}
+
+
+def get_context_budget(context_tokens: str, max_budget: int = 65536) -> int:
+    """Return the token budget for a given context size bucket.
+
+    Args:
+        context_tokens: Context size bucket name
+            ("small", "medium", "large", "xlarge").
+        max_budget: Absolute max token budget regardless of bucket.
+
+    Returns:
+        Token budget as an integer.
+    """
+    budget = CONTEXT_BUDGETS.get(context_tokens, max_budget)
+    return min(budget, max_budget)

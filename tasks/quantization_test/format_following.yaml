@@ -1,0 +1,27 @@
+id: quant.format_following_001
+family: format_following
+prompt: |
+  Output a valid JSON object describing a book with the following keys:
+  - "title" (string)
+  - "author" (string)
+  - "year" (integer)
+  - "genre" (string)
+
+  The book must be a real published book. Output ONLY the JSON object,
+  no markdown formatting, no explanations, no backticks.
+expected:
+  type: json_schema
+  schema:
+    type: object
+    required: [title, author, year, genre]
+    properties:
+      title:
+        type: string
+      author:
+        type: string
+      year:
+        type: integer
+      genre:
+        type: string
+scoring:
+  primary: json_schema

@@ -16,3 +16,11 @@ suites:
     max_concurrency: 2
     default_runs: 1
     default_temperature: 0
+
+  quantization_test:
+    description: "Quantization comparison suite"
+    task_dir: "tasks/quantization_test"
+    families: null
+    max_concurrency: 4
+    default_runs: 1
+    default_temperature: 0

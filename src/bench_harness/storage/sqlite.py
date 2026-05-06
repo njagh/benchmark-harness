@@ -58,6 +58,17 @@ class SQLiteStore:
         "prompt_style": "text",
     }
 
+    # M9 context size columns
+    _RUNS_CONTEXT_COLUMNS = {
+        "context_tokens": "str",
+        "estimated_prompt_tokens": "int",
+    }
+
+    # M10 quantization column
+    _RUNS_QUANT_COLUMNS = {
+        "quantization": "str",
+    }
+
     # M7 columns to add to score_details table
     _SCORE_DETAILS_EXTRA_COLUMNS = {
         "human_override": "int",
@@ -178,6 +189,24 @@ class SQLiteStore:
                     logger.warning(
                         "Failed to add column %s to runs table: %s", col, e,
                     )
+        for col, col_type in self._RUNS_CONTEXT_COLUMNS.items():
+            if col not in existing:
+                logger.info("Migrating runs table: adding context column %s", col)
+                try:
+                    self.db["runs"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to runs table: %s", col, e,
+                    )
+        for col, col_type in self._RUNS_QUANT_COLUMNS.items():
+            if col not in existing:
+                logger.info("Migrating runs table: adding quantization column %s", col)
+                try:
+                    self.db["runs"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to runs table: %s", col, e,
+                    )
 
     def _migrate_environments_schema(self) -> None:
         """Add any missing env columns to the environments table."""
@@ -213,6 +242,9 @@ class SQLiteStore:
                 "tokens_per_second": float,
                 "tokens_per_second_total": float,
                 "token_source": str,
+                "context_tokens": str,
+                "estimated_prompt_tokens": int,
+                "quantization": str,
                 "chunk_count": int,
                 "created_at": str,
             },
@@ -354,6 +386,9 @@ class SQLiteStore:
                 "human_note": result.human_note,
                 # M8 prompt style
                 "prompt_style": result.prompt_style,
+                # M9 context size
+                "context_tokens": result.context_tokens,
+                "estimated_prompt_tokens": result.estimated_prompt_tokens,
             },
         )
 
@@ -384,6 +419,8 @@ class SQLiteStore:
                 "token_source": result.token_source,
                 "chunk_count": 0,
                 "created_at": result.created_at,
+                "context_tokens": result.context_tokens,
+                "estimated_prompt_tokens": result.estimated_prompt_tokens,
             },
         )
 
@@ -430,6 +467,9 @@ class SQLiteStore:
                     "human_note": r.human_note,
                     # M8 prompt style
                     "prompt_style": r.prompt_style,
+                    # M9 context size
+                    "context_tokens": r.context_tokens,
+                    "estimated_prompt_tokens": r.estimated_prompt_tokens,
                 }
             )
         self.db["runs"].insert_all(rows)
@@ -540,6 +580,8 @@ class SQLiteStore:
                     "token_source": result.token_source,
                     "chunk_count": 0,
                     "created_at": result.created_at,
+                    "context_tokens": result.context_tokens,
+                    "estimated_prompt_tokens": result.estimated_prompt_tokens,
                 },
             )
         else:
@@ -791,3 +833,36 @@ class SQLiteStore:
             ORDER BY pc.created_at DESC
         """
         return list(self.db.query(query, [suite_id]))
+
+    def get_runs_by_task_family(
+        self,
+        suite_id: str,
+        family: str,
+    ) -> list[dict[str, Any]]:
+        """Get runs filtered by task family.
+
+        Extracts the family from the task_id prefix (e.g., 'local.docker_compose.*'
+        matches family 'docker_compose').
+
+        Args:
+            suite_id: Suite identifier.
+            family: Task family name (e.g., 'docker_compose', 'litellm_routing').
+
+        Returns:
+            List of run records matching the suite and family.
+        """
+        query = """
+            SELECT * FROM runs
+            WHERE suite_id = ?
+            AND (
+                task_id LIKE ?
+                OR task_id LIKE ?
+            )
+            ORDER BY created_at DESC
+        """
+        params: list[Any] = [
+            suite_id,
+            f"{family}%",
+            f"%.{family}.%",
+        ]
+        return list(self.db.query(query, params))

@@ -8,26 +8,18 @@ from pathlib import Path
 from typing import Any
 
 
-def generate_report(
+def _generate_legacy_report(
     runs: list[dict[str, Any]],
     suite_id: str,
     models_config: dict[str, Any],
     out_path: str,
 ) -> str:
-    """Generate a Markdown report from run results.
+    """Generate a Markdown report from run results (legacy v1).
 
     Includes summary, timing summary, per-task results, per-task timing,
     and slowest tasks sections.
-
-    Args:
-        runs: List of run result dicts from SQLiteStore.get_runs().
-        suite_id: Suite identifier.
-        models_config: Model config dict (from load_model_config).
-        out_path: Output file path for the report.
-
-    Returns:
-        The generated markdown string.
     """
+    lines: list[str] = []
     lines: list[str] = []
 
     # Header
@@ -227,6 +219,12 @@ def generate_report(
     # M8 Style Comparison sections
     _append_style_comparison(lines, runs)
 
+    # M9 Context Length Analysis sections
+    _append_context_analysis(lines, runs)
+
+    # M10 Quantization Comparison sections
+    _append_quantization_comparison(lines, runs)
+
     # Write to file
     output_path = Path(out_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -234,6 +232,39 @@ def generate_report(
 
     report_str = "\n".join(lines)
     return report_str
+
+
+def generate_report(
+    runs: list[dict[str, Any]],
+    suite_id: str,
+    models_config: dict[str, Any],
+    out_path: str,
+    v2: bool = False,
+    sections: list[str] | None = None,
+    prior_runs: list[dict[str, Any]] | None = None,
+) -> str:
+    """Generate a Markdown report from run results.
+
+    Args:
+        runs: List of run result dicts from SQLiteStore.get_runs().
+        suite_id: Suite identifier.
+        models_config: Model config dict (from load_model_config).
+        out_path: Output file path for the report.
+        v2: If True, use the modular v2 report generator.
+        sections: Which sections to include (default: all). Used when v2=True.
+        prior_runs: Prior run results for regression detection. Used when v2=True.
+
+    Returns:
+        The generated markdown string.
+    """
+    if v2:
+        from bench_harness.reports.v2 import generate_report_v2
+        return generate_report_v2(
+            runs, suite_id, models_config, out_path,
+            sections=sections, prior_runs=prior_runs,
+        )
+    else:
+        return _generate_legacy_report(runs, suite_id, models_config, out_path)
 
 
 def _group_by_family(runs: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -585,6 +616,146 @@ def _append_style_comparison(lines: list[str], runs: list[dict[str, Any]]) -> No
     from bench_harness.reports.style_comparison import generate_style_report
 
     report = generate_style_report(runs)
+    if report:
+        lines.append("")
+        lines.append(report)
+        lines.append("")
+
+
+def _append_context_analysis(
+    lines: list[str], runs: list[dict[str, Any]],
+) -> None:
+    """Append Context Length Analysis sections if context data exists.
+
+    Generates 3 sub-sections when context_tokens is detected in run data:
+    1. Context Length Analysis — grouped by context size bucket
+    2. Context Quality vs Length — score vs estimated_tokens table
+    3. Context Breakpoint Detection — identify quality drop points
+
+    Args:
+        lines: List of markdown line strings to append to.
+        runs: List of run result dicts.
+    """
+    context_runs = [r for r in runs if r.get("context_tokens") is not None]
+    if not context_runs:
+        return
+
+    # Group by context size
+    by_size: dict[str, list[dict]] = {}
+    for r in context_runs:
+        size = r["context_tokens"]
+        if size not in by_size:
+            by_size[size] = []
+        by_size[size].append(r)
+
+    # 1. Context Length Analysis — avg score, avg wall, avg tok/s per bucket
+    lines.append("## Context Length Analysis")
+    lines.append("")
+    lines.append("| Context Size | Tasks Run | Avg Score | Avg Wall (ms) | Avg Tok/s | Avg Est. Prompt Tokens |")
+    lines.append("|---|---|---|---|---|---|")
+
+    size_order = ["small", "medium", "large", "xlarge"]
+    for size in size_order:
+        size_runs = by_size.get(size, [])
+        if not size_runs:
+            continue
+        total = len(size_runs)
+        avg_score = sum(r.get("score_primary", 0) or 0 for r in size_runs) / max(total, 1)
+        avg_wall = sum(r.get("total_wall_ms", 0) for r in size_runs) / max(total, 1)
+        tps_vals = [r.get("tokens_per_second", 0) for r in size_runs if r.get("tokens_per_second", 0) > 0]
+        avg_tps = sum(tps_vals) / max(len(tps_vals), 1) if tps_vals else 0
+        est_tokens_vals = [r.get("estimated_prompt_tokens", 0) or 0 for r in size_runs]
+        avg_est = sum(est_tokens_vals) / max(total, 1)
+        lines.append(
+            f"| {size} | {total} | {avg_score:.3f} | {avg_wall:.0f} | {avg_tps:.1f} | {avg_est:.0f} |"
+        )
+
+    lines.append("")
+
+    # 2. Context Quality vs Length — per-task detail table
+    lines.append("## Context Quality vs Length")
+    lines.append("")
+    lines.append("| Task | Model | Context Size | Est. Tokens | Score | Wall (ms) |")
+    lines.append("|---|---|---|---|---|---|")
+
+    for r in context_runs:
+        task_id = r.get("task_id", "unknown")
+        alias = r.get("model_alias", "unknown")
+        size = r.get("context_tokens", "unknown")
+        est = r.get("estimated_prompt_tokens") or 0
+        score = r.get("score_primary")
+        score_str = f"{score:.3f}" if score is not None else "N/A"
+        wall = r.get("total_wall_ms", 0)
+        lines.append(f"| {task_id} | {alias} | {size} | {est} | {score_str} | {wall:.0f} |")
+
+    lines.append("")
+
+    # 3. Context Breakpoint Detection — identify where quality drops > 10%
+    lines.append("## Context Breakpoint Detection")
+    lines.append("")
+
+    # Group by model and task, ordered by size
+    breakpoints_found = False
+    for alias in sorted(by_size.keys()):
+        model_runs = by_size[alias]
+        # Group by task_id and compute avg score per size
+        task_scores: dict[str, dict[str, list[float]]] = {}
+        for r in model_runs:
+            tid = r.get("task_id", "unknown")
+            size = r.get("context_tokens", "unknown")
+            score = r.get("score_primary")
+            if tid not in task_scores:
+                task_scores[tid] = {}
+            if score is not None:
+                if size not in task_scores[tid]:
+                    task_scores[tid][size] = []
+                task_scores[tid][size].append(score)
+
+        for tid in sorted(task_scores.keys()):
+            size_scores = task_scores[tid]
+            # Get ordered scores
+            ordered_scores: list[tuple[str, float]] = []
+            for size in size_order:
+                if size in size_scores:
+                    avg = sum(size_scores[size]) / max(len(size_scores[size]), 1)
+                    ordered_scores.append((size, avg))
+
+            # Detect breakpoints: consecutive size pairs where score drops > 10%
+            for i in range(len(ordered_scores) - 1):
+                curr_size, curr_score = ordered_scores[i]
+                next_size, next_score = ordered_scores[i + 1]
+                if curr_score > 0:
+                    drop_pct = (curr_score - next_score) / curr_score
+                    if drop_pct > 0.10:
+                        breakpoints_found = True
+                        lines.append(
+                            f"- **{tid}** ({alias}): Quality drops {drop_pct:.0%} "
+                            f"from {curr_size} ({curr_score:.3f}) to {next_size} ({next_score:.3f})"
+                        )
+
+    if not breakpoints_found:
+        lines.append("No significant context breakpoints detected (>10% quality drop between consecutive sizes).")
+
+    lines.append("")
+
+
+def _append_quantization_comparison(lines: list[str], runs: list[dict[str, Any]]) -> None:
+    """Append Quantization Comparison report sections if runs have quantization metadata.
+
+    Generates full quantization comparison report when quantization field
+    is detected in run data.
+
+    Args:
+        lines: List of markdown line strings to append to.
+        runs: List of run result dicts.
+    """
+    quant_runs = [r for r in runs if r.get("quantization") is not None]
+    if not quant_runs:
+        return
+
+    from bench_harness.reports.quantization_comparison import generate_quantization_report
+
+    report = generate_quantization_report(runs)
     if report:
         lines.append("")
         lines.append(report)

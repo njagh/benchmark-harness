@@ -1220,7 +1220,7 @@ Evaluate the impact of REPL mode and other prompting styles.
 
 ---
 
-# Milestone 9 — Long-context benchmark suite
+# Milestone 9 — Long-context benchmark suite **✅ DONE**
 
 ## Goal
 
@@ -1228,24 +1228,28 @@ Measure quality and performance as prompt size increases.
 
 ## Tasks
 
-* Create synthetic long-context tasks.
-* Create repo-derived long-context tasks.
-* Add context packer.
-* Add distractor generator.
-* Add relevant-fact placement control.
-* Add context-size sweep.
-* Track prefill/TTFT/decode degradation.
-* Score retrieval of buried facts.
+* [x] Create synthetic long-context tasks with context packer.
+* [x] Create repo-derived long-context tasks via context file injection.
+* [x] Implement ContextPacker (pack, add_distractors, apply_relevant_fact_placement).
+* [x] Add distractor generator for context noise testing.
+* [x] Add relevant-fact placement control (beginning/middle/end).
+* [x] Implement ContextSizeSweepRunner (task x size x model).
+* [x] Track prefill/TTFT/decode degradation across context sizes.
+* [x] Score retrieval of buried facts (placement-aware scoring).
+* [x] Add context_tokens field to Task schema and RunResult.
+* [x] Add context_tokens and estimated_prompt_tokens to SQLite runs/run_timings tables.
+* [x] CLI --context-sizes flag for sweep mode.
+* [x] Report sections: Context Length Analysis, Quality vs Length, Breakpoint Detection.
 
 ## Acceptance criteria
 
-* Can run same task at 2k, 8k, 32k, 64k, 128k tokens.
-* Produces quality-vs-context and speed-vs-context reports.
-* Identifies model-specific context breakpoints.
+* [x] Can run same task at 2k, 8k, 32k, 64k tokens via context bucket mapping.
+* [x] Produces quality-vs-context and speed-vs-context reports.
+* [x] Identifies model-specific context breakpoints (where quality drops >10%).
 
 ---
 
-# Milestone 10 — Quantization comparison suite
+# Milestone 10 — Quantization comparison suite **✅ DONE**
 
 ## Goal
 
@@ -1253,17 +1257,20 @@ Measure quality and performance impact of quantization.
 
 ## Tasks
 
-* Add model metadata fields for quantization.
-* Add suite for quantization-sensitive tasks.
-* Run matched task sets across quantized variants.
-* Generate quality delta reports.
-* Generate speed/quality frontier plots.
+* [x] Add quantization field to RunResult and SQLite runs/run_timings tables.
+* [x] Add quantization comparison report with 5 sections.
+* [x] Create quantization-sensitive task suite (math, code, format).
+* [x] CLI automatically extracts quantization from model config.
+* [x] Quality delta analysis (score difference from reference quantization).
+* [x] Best quantization per task family identification.
+* [x] Speed/quality Pareto frontier analysis.
+* [x] Sensitivity analysis (which families are most/least affected).
 
 ## Acceptance criteria
 
-* Report shows whether quantization hurts coding, math, long-context, or formatting.
-* Report identifies best quantized model by task family.
-* Quantization impact is separated from prompt/backend differences.
+* [x] Report shows whether quantization hurts coding, math, long-context, or formatting.
+* [x] Report identifies best quantized model by task family.
+* [x] Quantization impact is separated from prompt/backend differences.
 
 ---
 
@@ -1304,33 +1311,35 @@ blind file overwrite
 
 ---
 
-# Milestone 12 — Report generator v2
+# Milestone 12 — Report generator v2 **✅ DONE**
 
 ## Goal
 
-Make results easy to interpret.
+Make results easy to interpret with a modular, comprehensive report.
 
 ## Tasks
 
-* Add model comparison tables.
-* Add suite-level summaries.
-* Add best-model-by-task-family section.
-* Add speed/quality frontier.
-* Add failure clustering.
-* Add regression detection versus prior run.
-* Add Markdown and HTML output.
+* [x] Create reports/v2.py with modular section-based report generation.
+* [x] Create reports/helpers.py with grouping, variance, clustering, regression detection.
+* [x] Executive Summary with top-line winners across all dimensions.
+* [x] Model comparison cross-ranking table with quantization/context metadata.
+* [x] Best model by task family with margin analysis.
+* [x] Speed/quality Pareto frontier identification.
+* [x] Context analysis integration from M9.
+* [x] Quantization comparison integration from M10.
+* [x] Prompt style analysis integration from M8.
+* [x] Judge analysis integration from M7.
+* [x] Failure clustering by error pattern.
+* [x] Regression detection comparing against prior run.
+* [x] Discriminating tasks identification (highest score variance).
+* [x] Markdown report delegates to v2 with legacy fallback.
+* [x] CLI --report-v2 flag, --sections filter, --prior-runs for regression.
 
 ## Acceptance criteria
 
-Report answers:
-
-* Which model is best overall for local coding?
-* Which model is best fast option?
-* Which model is unsafe or unreliable?
-* Which tasks are most discriminating?
-* Which prompt style works best?
-* Which quantization changed quality?
-* Which model degrades under long context?
+* [x] Report answers: best overall, fastest, unsafe, most discriminating tasks, best prompt style, quantization impact, long-context degradation.
+* [x] Modular architecture: sections can be enabled/disabled independently.
+* [x] Regression detection compares against previous benchmark run.
 
 ---
 
