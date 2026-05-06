@@ -1343,7 +1343,7 @@ Make results easy to interpret with a modular, comprehensive report.
 
 ---
 
-# Milestone 13 — Training-data export
+# Milestone 13 — Training-data export **✅ DONE**
 
 ## Goal
 
@@ -1351,12 +1351,15 @@ Turn benchmark results into future fine-tuning and preference datasets.
 
 ## Tasks
 
-* Export successful examples to SFT JSONL.
-* Export pairwise winners to DPO/ORPO JSONL.
-* Export failed examples to regression suite.
-* Export judge-labeled examples.
-* Add manual review status.
-* Add data hygiene filters.
+* [x] Implement SFT export — successful runs as OpenAI messages JSONL.
+* [x] Implement preference export — score-based grouping with min_margin filter.
+* [x] Implement preference export from pairwise_comparisons table.
+* [x] Implement regression export — failed runs grouped by task in YAML.
+* [x] Implement judge export — judge_evaluations as JSONL with dimensions.
+* [x] Implement judge pairwise export — pairwise comparisons as JSONL.
+* [x] Add base export helpers (get_runs_by_suite, get_task_by_id, etc.).
+* [x] Add CLI export subcommand with --action flag.
+* [x] Add comprehensive tests for all export functions.
 
 Export formats:
 
@@ -1369,9 +1372,22 @@ judge_scores.jsonl
 
 ## Acceptance criteria
 
-* A failed benchmark task can become a regression test.
-* A high-quality response can become an SFT example.
-* A model comparison can become preference data.
+* [x] A failed benchmark task can become a regression test (export_regression).
+* [x] A high-quality response can become an SFT example (export_sft with min_score filter).
+* [x] A model comparison can become preference data (export_preference_score_based).
+* [x] SFT export respects min_score filter and system_message inclusion.
+* [x] SFT export includes generated_code for code tasks.
+* [x] Preference export groups by task_id and picks best/worst.
+* [x] Preference export supports min_margin threshold.
+* [x] Preference export from pairwise uses pairwise_comparisons table.
+* [x] Regression export groups failed runs by task with full task_definition.
+* [x] Regression export excludes API-only errors (empty raw_response).
+* [x] Judge export includes per-dimension scores and explanations.
+* [x] Judge pairwise export includes dimension_comparison data.
+* [x] All exports produce valid JSONL/YAML output.
+* [x] All exports tested with in-memory SQLite database.
+
+---
 
 ---
 
@@ -1522,8 +1538,8 @@ Outcome: benchmark failures become training data and regression tests.
 * [ ] Add long-context context packer.
 * [ ] Add quantization comparison reports.
 * [ ] Add command safety classifier.
-* [ ] Add SFT export.
-* [ ] Add DPO export.
+* [x] Add SFT export.
+* [x] Add DPO export.
 * [ ] Add dashboard or notebook.
 
 ---

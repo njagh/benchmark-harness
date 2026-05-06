@@ -4,7 +4,7 @@ Evaluates response quality, coding ability, instruction following, and performan
 
 ## Current Status
 
-**Phase:** Milestones M1–M12 complete. M13 (training-data export) next.
+**Phase:** Milestones M1–M13 complete. M14 (dashboard) next.
 
 The `ROADMAP.md` defines 15 milestones across 4 phases. Detailed execution plans with library integration notes are in `milestones/`. Virtual environment and core dependencies are set up.
 
@@ -46,7 +46,7 @@ pip install -e ".[long-context]"
 | 10 | Quantization Comparison Suite | C — Deep comparison | **Done** |
 | 11 | Agent Safety and Command Discipline | C — Deep comparison | Not started |
 | 12 | Report Generator v2 | C — Deep comparison | **Done** |
-| 13 | Training-Data Export | D — Data flywheel | Not started |
+| 13 | Training-Data Export | D — Data flywheel | **Done** |
 | 14 | Dashboard / Analysis Notebook | D — Data flywheel | Not started |
 | 15 | CI / Regression Mode | D — Data flywheel | Not started |
 

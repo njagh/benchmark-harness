@@ -537,7 +537,135 @@ def main():
     app()
 
 
-# Register judge_app as a group under the main app
+export_app = typer.Typer(
+    name="export",
+    help="Export benchmark results as training datasets",
+    add_completion=False,
+)
+
+
+@export_app.command(name="sft")
+def export_sft_cmd(
+    suite_id: str = typer.Option("smoke", "--suite", help="Suite ID to export from"),
+    db_path: str = typer.Option(None, "--db", help="Path to benchmark.db"),
+    out: Path = typer.Option(Path("exports"), "--out", help="Output directory"),
+    min_score: float = typer.Option(0.0, "--min-score", help="Minimum score for SFT export"),
+    no_system: bool = typer.Option(False, "--no-system", help="Exclude system messages"),
+):
+    """Export successful runs as SFT JSONL (OpenAI messages format)."""
+    from bench_harness.export import export_sft as _export_sft
+
+    db = db_path or _resolve_db_path(out, suite_id)
+    result = _export_sft(
+        db, suite_id, str(out), min_score=min_score,
+        include_system_messages=not no_system,
+    )
+    console.print(f"[green]SFT export complete:[/green] {result}")
+
+
+@export_app.command(name="preference")
+def export_preference_cmd(
+    suite_id: str = typer.Option("smoke", "--suite", help="Suite ID to export from"),
+    db_path: str = typer.Option(None, "--db", help="Path to benchmark.db"),
+    out: Path = typer.Option(Path("exports"), "--out", help="Output directory"),
+    min_margin: float = typer.Option(0.1, "--min-margin", help="Min score margin for preference export"),
+):
+    """Export pairwise preferences as DPO JSONL."""
+    from bench_harness.export import export_preference as _export_pref
+
+    db = db_path or _resolve_db_path(out, suite_id)
+    result = _export_pref(db, suite_id, str(out), min_score_margin=min_margin)
+    console.print(f"[green]Preference export complete:[/green] {result}")
+
+
+@export_app.command(name="regression")
+def export_regression_cmd(
+    suite_id: str = typer.Option("smoke", "--suite", help="Suite ID to export from"),
+    db_path: str = typer.Option(None, "--db", help="Path to benchmark.db"),
+    out: Path = typer.Option(Path("exports"), "--out", help="Output directory"),
+    include_api_errors: bool = typer.Option(False, "--include-api-errors", help="Include API errors in regression"),
+):
+    """Export failed tasks as YAML regression suite."""
+    from bench_harness.export import export_regression as _export_reg
+
+    db = db_path or _resolve_db_path(out, suite_id)
+    result = _export_reg(
+        db, suite_id, str(out),
+        exclude_api_errors=not include_api_errors,
+    )
+    console.print(f"[green]Regression export complete:[/green] {result}")
+
+
+@export_app.command(name="judge")
+def export_judge_cmd(
+    suite_id: str = typer.Option("smoke", "--suite", help="Suite ID to export from"),
+    db_path: str = typer.Option(None, "--db", help="Path to benchmark.db"),
+    out: Path = typer.Option(Path("exports"), "--out", help="Output directory"),
+    no_pairwise: bool = typer.Option(False, "--no-pairwise", help="Exclude pairwise comparisons"),
+):
+    """Export judge evaluations as JSONL."""
+    from bench_harness.export import export_judge as _export_judge
+
+    db = db_path or _resolve_db_path(out, suite_id)
+    result = _export_judge(db, suite_id, str(out), include_pairwise=not no_pairwise)
+    console.print(f"[green]Judge export complete:[/green] {result}")
+
+
+@export_app.command(name="all")
+def export_all_cmd(
+    suite_id: str = typer.Option("smoke", "--suite", help="Suite ID to export from"),
+    db_path: str = typer.Option(None, "--db", help="Path to benchmark.db"),
+    out: Path = typer.Option(Path("exports"), "--out", help="Output directory"),
+    min_score: float = typer.Option(0.0, "--min-score", help="Minimum score for SFT export"),
+    min_margin: float = typer.Option(0.1, "--min-margin", help="Min score margin for preference export"),
+    include_api_errors: bool = typer.Option(False, "--include-api-errors", help="Include API errors in regression"),
+    no_pairwise: bool = typer.Option(False, "--no-pairwise", help="Exclude pairwise comparisons"),
+    no_system: bool = typer.Option(False, "--no-system", help="Exclude system messages"),
+):
+    """Export all four formats: SFT, DPO, regression, and judge data."""
+    from bench_harness.export import (
+        export_sft as _export_sft,
+        export_preference as _export_pref,
+        export_regression as _export_reg,
+        export_judge as _export_judge,
+    )
+
+    db = db_path or _resolve_db_path(out, suite_id)
+
+    sft_path = _export_sft(
+        db, suite_id, str(out), min_score=min_score,
+        include_system_messages=not no_system,
+    )
+    console.print(f"[green]SFT export:[/green] {sft_path}")
+
+    pref_path = _export_pref(
+        db, suite_id, str(out), min_score_margin=min_margin,
+    )
+    console.print(f"[green]Preference export:[/green] {pref_path}")
+
+    reg_path = _export_reg(
+        db, suite_id, str(out),
+        exclude_api_errors=not include_api_errors,
+    )
+    console.print(f"[green]Regression export:[/green] {reg_path}")
+
+    judge_path = _export_judge(
+        db, suite_id, str(out), include_pairwise=not no_pairwise,
+    )
+    console.print(f"[green]Judge export:[/green] {judge_path}")
+
+
+def _resolve_db_path(out_dir: Path, suite_id: str) -> str:
+    """Resolve default database path."""
+    out = Path(out_dir)
+    db = out / "benchmark.db"
+    if db.exists():
+        return str(db)
+    return str(out / "benchmark.db")
+
+
+# Register apps
+app.add_typer(export_app, name="export")
 app.add_typer(judge_app, name="judge-config")
 
 if __name__ == "__main__":
