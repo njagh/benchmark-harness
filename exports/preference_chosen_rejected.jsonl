@@ -1,0 +1,1 @@
+{"messages": [{"role": "user", "content": ""}, {"role": "assistant", "content": "A"}], "chosen": {"model": "model-a", "score": 0.9}, "rejected": {"model": "model-b", "score": 0.3}, "margin": 0.6000000000000001, "task_id": "test.task_001", "prompt": ""}

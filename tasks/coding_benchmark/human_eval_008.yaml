@@ -1,0 +1,42 @@
+id: benchmark.human_eval_008
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def string_xor(a: str, b: str) -> str:
+      """Perform bitwise XOR on two binary strings.
+
+      >>> string_xor("1101", "1011")
+      '0110'
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_008 import string_xor
+    class TestStringXor(unittest.TestCase):
+        def test_basic(self):
+            self.assertEqual(string_xor("1101", "1011"), "0110")
+        def test_same(self):
+            self.assertEqual(string_xor("1010", "1010"), "0000")
+        def test_zero(self):
+            self.assertEqual(string_xor("0000", "1111"), "1111")
+  entry_point: string_xor
+  test_framework: pytest
+  patterns:
+    - "def string_xor"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

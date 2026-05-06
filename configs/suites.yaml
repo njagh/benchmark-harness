@@ -24,3 +24,12 @@ suites:
     max_concurrency: 4
     default_runs: 1
     default_temperature: 0
+
+  coding_benchmark:
+    description: "HumanEval + MBPP coding benchmark (first 16+4 tasks)"
+    task_dir: "tasks/coding_benchmark"
+    families:
+      - coding
+    max_concurrency: 2
+    default_runs: 1
+    default_temperature: 0

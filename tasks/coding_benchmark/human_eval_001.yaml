@@ -1,0 +1,44 @@
+id: benchmark.human_eval_001
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def above_normalize(arr: List[float]) -> List[float]:
+      """Return a list with all values above the mean normalized to [0,1].
+
+      >>> above_normalize([1.0, 2.0, 3.0, 4.0, 5.0])
+      [0.0, 0.25, 0.5, 0.75, 1.0]
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_001 import above_normalize
+    class TestAboveNormalize(unittest.TestCase):
+        def test_basic(self):
+            result = above_normalize([1.0, 2.0, 3.0, 4.0, 5.0])
+            self.assertAlmostEqual(result[0], 0.0, places=5)
+            self.assertAlmostEqual(result[4], 1.0, places=5)
+        def test_equal(self):
+            result = above_normalize([2.0, 2.0, 2.0])
+            self.assertAlmostEqual(result[0], 0.0, places=5)
+  entry_point: above_normalize
+  test_framework: pytest
+  patterns:
+    - "def above_normalize"
+    - "sum("
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

@@ -1,0 +1,44 @@
+id: benchmark.human_eval_015
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def str_xor(a: str, b: str) -> str:
+      """XOR two binary strings digit by digit.
+
+      >>> str_xor("1101", "1011")
+      '0110'
+      >>> str_xor("000", "111")
+      '111'
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_015 import str_xor
+    class TestStrXor(unittest.TestCase):
+        def test_basic(self):
+            self.assertEqual(str_xor("1101", "1011"), "0110")
+        def test_opposite(self):
+            self.assertEqual(str_xor("000", "111"), "111")
+        def test_same(self):
+            self.assertEqual(str_xor("1010", "1010"), "0000")
+  entry_point: str_xor
+  test_framework: pytest
+  patterns:
+    - "def str_xor"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

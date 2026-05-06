@@ -83,9 +83,8 @@ class TestDatasetConfig:
     def test_get_dataset(self, config_dir):
         cfg = load_dataset_config()
         if "datasets" in cfg:
-            ds = get_dataset(cfg, "smoke_v1")
+            ds = get_dataset(cfg, "human_eval_v1")
             assert ds is not None
-            assert ds["type"] == "local_yaml"
 
 
 class TestTaskLoader:

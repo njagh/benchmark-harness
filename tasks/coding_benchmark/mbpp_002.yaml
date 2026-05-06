@@ -1,0 +1,41 @@
+id: benchmark.mbpp_002
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Write a Python function for the following task:
+
+  Task: Write a function to check if a string is a palindrome.
+
+  ```python
+  # YOUR CODE HERE
+  def is_palindrome(s):
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from mbpp_002 import is_palindrome
+    class TestIsPalindrome(unittest.TestCase):
+        def test_basic(self):
+            self.assertTrue(is_palindrome("racecar"))
+        def test_not_palindrome(self):
+            self.assertFalse(is_palindrome("hello"))
+        def test_empty(self):
+            self.assertTrue(is_palindrome(""))
+        def test_single(self):
+            self.assertTrue(is_palindrome("a"))
+  entry_point: is_palindrome
+  test_framework: pytest
+  patterns:
+    - "def is_palindrome"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

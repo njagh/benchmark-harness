@@ -1,0 +1,48 @@
+id: benchmark.human_eval_013
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def tri(n: int) -> int:
+      """Calculate the n-th Tribonacci number. tri(0) = 0, tri(1) = 1, tri(2) = 1, tri(n+3) = tri(n) + tri(n+1) + tri(n+2).
+
+      >>> tri(3)
+      2
+      >>> tri(4)
+      4
+      >>> tri(5)
+      7
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_013 import tri
+    class TestTri(unittest.TestCase):
+        def test_base(self):
+            self.assertEqual(tri(0), 0)
+            self.assertEqual(tri(1), 1)
+            self.assertEqual(tri(2), 1)
+        def test_basic(self):
+            self.assertEqual(tri(3), 2)
+            self.assertEqual(tri(4), 4)
+            self.assertEqual(tri(5), 7)
+  entry_point: tri
+  test_framework: pytest
+  patterns:
+    - "def tri"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

@@ -1,0 +1,1 @@
+{"task_id": "test.task_001", "model_a": "model-a", "model_b": "model-b", "winner": "A", "margin": "0.15", "confidence": 0.85, "reason": "A is better", "dimension_comparison": {}, "is_pairwise": true, "judge_model": null, "human_override": 0, "human_winner": null}

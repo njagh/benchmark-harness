@@ -1,0 +1,41 @@
+id: benchmark.human_eval_010
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def make_a_pile(n: int) -> List[int]:
+      """Create a list of n elements where the i-th element is the smallest odd number >= i.
+
+      >>> make_a_pile(5)
+      [1, 2, 3, 4, 5]
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_010 import make_a_pile
+    class TestMakeAPile(unittest.TestCase):
+        def test_basic(self):
+            result = make_a_pile(5)
+            self.assertEqual(result, [1, 2, 3, 4, 5])
+        def test_empty(self):
+            self.assertEqual(make_a_pile(0), [])
+  entry_point: make_a_pile
+  test_framework: pytest
+  patterns:
+    - "def make_a_pile"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

@@ -1,0 +1,46 @@
+id: benchmark.human_eval_014
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def is_multiplied_even(numbers: List[int]) -> bool:
+      """Return True if the count of even numbers in the list is even.
+
+      >>> is_multiplied_even([2, 4, 6])
+      True
+      >>> is_multiplied_even([2, 4, 5])
+      False
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_014 import is_multiplied_even
+    class TestIsMultipliedEven(unittest.TestCase):
+        def test_all_even(self):
+            self.assertTrue(is_multiplied_even([2, 4, 6]))
+        def test_mixed(self):
+            self.assertFalse(is_multiplied_even([2, 4, 5]))
+        def test_empty(self):
+            self.assertTrue(is_multiplied_even([]))
+        def test_one_even(self):
+            self.assertFalse(is_multiplied_even([2, 3]))
+  entry_point: is_multiplied_even
+  test_framework: pytest
+  patterns:
+    - "def is_multiplied_even"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

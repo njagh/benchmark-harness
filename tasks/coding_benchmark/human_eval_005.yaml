@@ -1,0 +1,48 @@
+id: benchmark.human_eval_005
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def fibonacci(n: int) -> int:
+      """Return the n-th Fibonacci number using 0-based indexing.
+
+      >>> fibonacci(1)
+      1
+      >>> fibonacci(5)
+      8
+      >>> fibonacci(10)
+      89
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_005 import fibonacci
+    class TestFibonacci(unittest.TestCase):
+        def test_base(self):
+            self.assertEqual(fibonacci(1), 1)
+        def test_small(self):
+            self.assertEqual(fibonacci(5), 8)
+        def test_large(self):
+            self.assertEqual(fibonacci(10), 89)
+        def test_zero(self):
+            self.assertEqual(fibonacci(0), 0)
+  entry_point: fibonacci
+  test_framework: pytest
+  patterns:
+    - "def fibonacci"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

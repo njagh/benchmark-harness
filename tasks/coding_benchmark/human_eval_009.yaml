@@ -1,0 +1,42 @@
+id: benchmark.human_eval_009
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def sum_product(numbers: List[int]) -> tuple:
+      """Return sum and product of a list of integers.
+
+      >>> sum_product([1, 2, 3, 4])
+      (10, 24)
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_009 import sum_product
+    class TestSumProduct(unittest.TestCase):
+        def test_basic(self):
+            self.assertEqual(sum_product([1, 2, 3, 4]), (10, 24))
+        def test_single(self):
+            self.assertEqual(sum_product([5]), (5, 5))
+        def test_empty(self):
+            self.assertEqual(sum_product([]), (0, 1))
+  entry_point: sum_product
+  test_framework: pytest
+  patterns:
+    - "def sum_product"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

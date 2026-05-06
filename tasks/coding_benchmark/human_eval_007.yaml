@@ -1,0 +1,42 @@
+id: benchmark.human_eval_007
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def filter_by_prefix(strings: List[str], prefix: str) -> List[str]:
+      """Filter strings by prefix.
+
+      >>> filter_by_prefix(["apple", "banana", "apricot"], "app")
+      ['apple', 'apricot']
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_007 import filter_by_prefix
+    class TestFilterByPrefix(unittest.TestCase):
+        def test_basic(self):
+            result = filter_by_prefix(["apple", "banana", "apricot"], "app")
+            self.assertEqual(result, ['apple', 'apricot'])
+        def test_none(self):
+            result = filter_by_prefix(["apple", "banana"], "xyz")
+            self.assertEqual(result, [])
+  entry_point: filter_by_prefix
+  test_framework: pytest
+  patterns:
+    - "def filter_by_prefix"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

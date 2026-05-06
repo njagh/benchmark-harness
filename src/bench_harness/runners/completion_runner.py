@@ -119,7 +119,7 @@ def build_messages(task: dict, prompt: str) -> list[dict]:
     defaults to user-only messages.
     """
     messages = []
-    system_msg = task.get("input", {}).get("system_message")
+    system_msg = (task.get("input") or {}).get("system_message")
     if system_msg:
         messages.append({"role": "system", "content": system_msg})
     messages.append({"role": "user", "content": prompt})

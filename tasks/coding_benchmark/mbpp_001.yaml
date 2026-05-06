@@ -1,0 +1,41 @@
+id: benchmark.mbpp_001
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Write a Python function for the following task:
+
+  Task: Write a function to count the number of vowels in a string.
+
+  ```python
+  # YOUR CODE HERE
+  def count_vowels(s):
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from mbpp_001 import count_vowels
+    class TestCountVowels(unittest.TestCase):
+        def test_basic(self):
+            self.assertEqual(count_vowels("hello"), 2)
+        def test_empty(self):
+            self.assertEqual(count_vowels(""), 0)
+        def test_all_vowels(self):
+            self.assertEqual(count_vowels("aeiou"), 5)
+        def test_consonants(self):
+            self.assertEqual(count_vowels("bcdfg"), 0)
+  entry_point: count_vowels
+  test_framework: pytest
+  patterns:
+    - "def count_vowels"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

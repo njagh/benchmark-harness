@@ -1,0 +1,44 @@
+id: benchmark.human_eval_002
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def below_zero(lst: List[float]) -> bool:
+      """Return True if the running total of elements goes negative at any point.
+
+      >>> below_zero([1.0, 2.0, 3.0])
+      False
+      >>> below_zero([1.0, -2.0, 3.0])
+      True
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_002 import below_zero
+    class TestBelowZero(unittest.TestCase):
+        def test_positive(self):
+            self.assertFalse(below_zero([1.0, 2.0, 3.0]))
+        def test_negative(self):
+            self.assertTrue(below_zero([1.0, -2.0, 3.0]))
+        def test_all_negative(self):
+            self.assertTrue(below_zero([-1.0, -2.0]))
+  entry_point: below_zero
+  test_framework: pytest
+  patterns:
+    - "def below_zero"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

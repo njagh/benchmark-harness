@@ -1,0 +1,1 @@
+{"run_id": "r1", "task_id": "test.task_001", "model_alias": "model-a", "judge_model": "judge_1", "rubric_name": "quality_rubric", "score": "{\"correctness\": 4}", "dimensions": {"correctness": 4}, "explanation": "Good job", "is_pairwise": false, "pairwise": null, "prompt": "", "raw_response": "A", "score_primary": 0.8}

@@ -1,0 +1,1 @@
+{"chosen": {"model": "model-a"}, "rejected": {"model": "model-b"}, "reason": "A is more accurate", "task_id": "test.task_001", "prompt": "", "confidence": 0.8, "margin": "0.2"}

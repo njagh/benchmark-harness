@@ -1,0 +1,47 @@
+id: benchmark.human_eval_000
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def has_close_elements(numbers: List[float], threshold: float) -> bool:
+      """Check if any two numbers in the list are closer than threshold.
+
+      >>> has_close_elements([1.0, 2.0, 3.0], 0.5)
+      False
+      >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0, 3.0], 0.3)
+      True
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_000 import has_close_elements
+    class TestHasCloseElements(unittest.TestCase):
+        def test_case_1(self):
+            self.assertFalse(has_close_elements([1.0, 2.0, 3.0], 0.5))
+        def test_case_2(self):
+            self.assertTrue(has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0, 3.0], 0.3))
+        def test_case_3(self):
+            self.assertFalse(has_close_elements([1.0, 2.0, 3.0, -1.0, 2.0, 0.0], 1.0))
+        def test_case_4(self):
+            self.assertTrue(has_close_elements([0.1, 0.2, 0.3], 0.05))
+  entry_point: has_close_elements
+  test_framework: pytest
+  patterns:
+    - "def has_close_elements"
+    - "for i in range"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

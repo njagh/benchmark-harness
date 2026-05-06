@@ -1,0 +1,40 @@
+id: benchmark.mbpp_000
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Write a Python function for the following task:
+
+  Task: Write a function to find the largest element in a list.
+
+  ```python
+  # YOUR CODE HERE
+  def find_max_value(lst):
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from mbpp_000 import find_max_value
+    class TestFindMax(unittest.TestCase):
+        def test_basic(self):
+            self.assertEqual(find_max_value([1, 2, 3]), 3)
+        def test_negative(self):
+            self.assertEqual(find_max_value([-1, -2, -3]), -1)
+        def test_single(self):
+            self.assertEqual(find_max_value([5]), 5)
+  entry_point: find_max_value
+  test_framework: pytest
+  patterns:
+    - "def find_max_value"
+    - "max("
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

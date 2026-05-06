@@ -1,0 +1,42 @@
+id: benchmark.human_eval_006
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def all_prefixes(lst: List[str]) -> List[str]:
+      """Return all non-empty prefixes of the string, longest first.
+
+      >>> all_prefixes("abc")
+      ['abc', 'ab', 'a']
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_006 import all_prefixes
+    class TestAllPrefixes(unittest.TestCase):
+        def test_basic(self):
+            result = all_prefixes("abc")
+            self.assertEqual(result, ['abc', 'ab', 'a'])
+        def test_single(self):
+            result = all_prefixes("a")
+            self.assertEqual(result, ['a'])
+  entry_point: all_prefixes
+  test_framework: pytest
+  patterns:
+    - "def all_prefixes"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

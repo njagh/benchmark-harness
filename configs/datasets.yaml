@@ -1,22 +1,16 @@
-# Dataset registry — all benchmark data is loaded from local pinned files.
-# Never stream from HuggingFace during measured runs.
-# See STORAGE_PLAN.md for dataset layout and access patterns.
-
 datasets:
-  # Local task packs live in the repo under tasks/
-  smoke_v1:
-    type: local_yaml
-    path: "tasks/smoke"
-    description: "Five smoke tasks for harness verification"
+  human_eval_v1:
+    hf_name: "openai/openai_humaneval"
+    hf_split: "test"
+    sample_count: 164
+    sample_seed: 1234
+    output_dir: "/mnt/datasets-big/evals/human_eval_v1"
+    dataset_type: human_eval
 
-  coding_smoke_v1:
-    type: local_yaml
-    path: "tasks/coding_smoke"
-    description: "Coding regression smoke tasks"
-
-  # External eval data lives in /mnt/datasets-big/evals/
-  # These are populated by scripts/prepare_eval_dataset.py (M2+)
-  # mmlu_pro_v1:
-  #   type: jsonl
-  #   path: "/mnt/datasets-big/evals/mmlu_pro_v1/tasks.jsonl"
-  #   manifest: "/mnt/datasets-big/evals/mmlu_pro_v1/MANIFEST.json"
+  mbpp_v1:
+    hf_name: "google-research-datasets/mbpp"
+    hf_split: "test"
+    sample_count: 500
+    sample_seed: 1234
+    output_dir: "/mnt/datasets-big/evals/mbpp_v1"
+    dataset_type: mbpp

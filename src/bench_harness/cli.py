@@ -376,7 +376,7 @@ def list_tasks(
 
     # Check for known task directories
     root = Path(__file__).resolve().parent.parent.parent
-    for td in ("tasks/smoke", "tasks/coding_smoke", "tasks/local_coding_agent_v1"):
+    for td in ("tasks/smoke", "tasks/coding_smoke", "tasks/local_coding_agent_v1", "tasks/coding_benchmark"):
         td_path = root / td
         if td_path.exists():
             task_dirs.append(str(td_path))
@@ -436,7 +436,7 @@ def show_task(
     registry = TaskRegistry()
 
     root = Path(__file__).resolve().parent.parent.parent
-    for td in ("tasks/smoke", "tasks/coding_smoke", "tasks/local_coding_agent_v1"):
+    for td in ("tasks/smoke", "tasks/coding_smoke", "tasks/local_coding_agent_v1", "tasks/coding_benchmark"):
         td_path = root / td
         if td_path.exists():
             registry.load_from_directory(str(td_path))

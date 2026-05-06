@@ -1,0 +1,42 @@
+id: benchmark.human_eval_011
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def separate_paren_groups(paren_string: str) -> List[str]:
+      """Separate nested groups of parentheses.
+
+      >>> separate_paren_groups("(()()) ((())) () ((())()())")
+      ['(())()', '((()))', '()', '((())()())']
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_011 import separate_paren_groups
+    class TestSeparateParenGroups(unittest.TestCase):
+        def test_basic(self):
+            result = separate_paren_groups("(()()) ((())) () ((())()())")
+            self.assertEqual(result, ['(())()', '((()))', '()', '((())()())'])
+        def test_single(self):
+            result = separate_paren_groups("()")
+            self.assertEqual(result, ['()'])
+  entry_point: separate_paren_groups
+  test_framework: pytest
+  patterns:
+    - "def separate_paren_groups"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion

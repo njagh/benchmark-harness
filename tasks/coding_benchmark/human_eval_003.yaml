@@ -1,0 +1,42 @@
+id: benchmark.human_eval_003
+family: coding
+category: function_completion
+source: public
+prompt: |
+  Complete the following Python function:
+
+  ```python
+  from typing import List
+  def average_relative_distance(numbers: List[float]) -> float:
+      """Calculate the average of all pairwise absolute differences.
+
+      >>> average_relative_distance([1.0, 2.0, 3.0])
+      0.66667
+      """
+      ...
+  ```
+
+  Output ONLY the completed function. No explanations.
+scoring:
+  primary: unit_test
+  secondary: [format_compliance]
+expected:
+  type: unit_test
+  test_code: |
+    import unittest
+    from benchmark_003 import average_relative_distance
+    class TestAverageRelativeDistance(unittest.TestCase):
+        def test_basic(self):
+            result = average_relative_distance([1.0, 2.0, 3.0])
+            self.assertAlmostEqual(result, 2.0 / 3.0, places=4)
+        def test_single(self):
+            result = average_relative_distance([1.0])
+            self.assertAlmostEqual(result, 0.0, places=4)
+  entry_point: average_relative_distance
+  test_framework: pytest
+  patterns:
+    - "def average_relative_distance"
+  format_checks:
+    - type: code_block
+risk_level: low
+code_type: function_completion
