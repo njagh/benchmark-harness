@@ -69,6 +69,25 @@ class SQLiteStore:
         "quantization": "str",
     }
 
+    # M11 command safety columns
+    _RUNS_SAFETY_COLUMNS = {
+        "safety_score": "float",
+        "safety_details": "text",
+    }
+
+    # M14 identity stamp columns on runs table
+    _RUNS_IDENTITY_COLUMNS = {
+        "requested_alias": "text",
+        "litellm_model_name": "text",
+        "openai_models_id": "text",
+        "vllm_served_model_name": "text",
+        "vllm_container_name": "text",
+        "hf_model_id": "text",
+        "backend_url": "text",
+        "server_start_time": "text",
+        "speculative_decoding_enabled": "int",
+    }
+
     # M7 columns to add to score_details table
     _SCORE_DETAILS_EXTRA_COLUMNS = {
         "human_override": "int",
@@ -99,6 +118,7 @@ class SQLiteStore:
         self._migrate_runs_schema()
         self._migrate_environments_schema()
         self._create_run_timings_table()
+        self._migrate_run_timings_schema()
         self._create_score_details_table()
         self._create_indexes()
         self._create_judge_evaluations_table()
@@ -207,6 +227,24 @@ class SQLiteStore:
                     logger.warning(
                         "Failed to add column %s to runs table: %s", col, e,
                     )
+        for col, col_type in self._RUNS_SAFETY_COLUMNS.items():
+            if col not in existing:
+                logger.info("Migrating runs table: adding safety column %s", col)
+                try:
+                    self.db["runs"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to runs table: %s", col, e,
+                    )
+        for col, col_type in self._RUNS_IDENTITY_COLUMNS.items():
+            if col not in existing:
+                logger.info("Migrating runs table: adding identity column %s", col)
+                try:
+                    self.db["runs"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to runs table: %s", col, e,
+                    )
 
     def _migrate_environments_schema(self) -> None:
         """Add any missing env columns to the environments table."""
@@ -247,10 +285,47 @@ class SQLiteStore:
                 "quantization": str,
                 "chunk_count": int,
                 "created_at": str,
+                # M14 identity stamp
+                "requested_alias": str,
+                "litellm_model_name": str,
+                "openai_models_id": str,
+                "vllm_served_model_name": str,
+                "vllm_container_name": str,
+                "hf_model_id": str,
+                "backend_url": str,
+                "server_start_time": str,
+                "speculative_decoding_enabled": int,
             },
             pk="run_id",
             if_not_exists=True,
         )
+
+    def _migrate_run_timings_schema(self) -> None:
+        """Add identity stamp columns to run_timings table."""
+        existing = set(self.db["run_timings"].columns)
+        identity_cols = {
+            "requested_alias": "text",
+            "litellm_model_name": "text",
+            "openai_models_id": "text",
+            "vllm_served_model_name": "text",
+            "vllm_container_name": "text",
+            "hf_model_id": "text",
+            "backend_url": "text",
+            "server_start_time": "text",
+            "speculative_decoding_enabled": "int",
+        }
+        for col, col_type in identity_cols.items():
+            if col not in existing:
+                logger.info(
+                    "Migrating run_timings table: adding identity column %s", col
+                )
+                try:
+                    self.db["run_timings"].add_column(col, col_type)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to add column %s to run_timings table: %s",
+                        col, e,
+                    )
 
     def _create_score_details_table(self) -> None:
         """Create the score_details table for per-scorer breakdown."""
@@ -389,6 +464,27 @@ class SQLiteStore:
                 # M9 context size
                 "context_tokens": result.context_tokens,
                 "estimated_prompt_tokens": result.estimated_prompt_tokens,
+                # M10 quantization
+                "quantization": result.quantization,
+                # M11 command safety
+                "safety_score": result.safety_score,
+                "safety_details": (
+                    json.dumps(result.safety_details)
+                    if result.safety_details is not None
+                    else None
+                ),
+                # M14 identity stamp
+                "requested_alias": result.requested_alias,
+                "litellm_model_name": result.litellm_model_name,
+                "openai_models_id": result.openai_models_id,
+                "vllm_served_model_name": result.vllm_served_model_name,
+                "vllm_container_name": result.vllm_container_name,
+                "hf_model_id": result.hf_model_id,
+                "backend_url": result.backend_url,
+                "server_start_time": result.server_start_time,
+                "speculative_decoding_enabled": (
+                    1 if result.speculative_decoding_enabled else 0
+                ),
             },
         )
 
@@ -470,6 +566,27 @@ class SQLiteStore:
                     # M9 context size
                     "context_tokens": r.context_tokens,
                     "estimated_prompt_tokens": r.estimated_prompt_tokens,
+                    # M10 quantization
+                    "quantization": r.quantization,
+                    # M11 command safety
+                    "safety_score": r.safety_score,
+                    "safety_details": (
+                        json.dumps(r.safety_details)
+                        if r.safety_details is not None
+                        else None
+                    ),
+                    # M14 identity stamp
+                    "requested_alias": r.requested_alias,
+                    "litellm_model_name": r.litellm_model_name,
+                    "openai_models_id": r.openai_models_id,
+                    "vllm_served_model_name": r.vllm_served_model_name,
+                    "vllm_container_name": r.vllm_container_name,
+                    "hf_model_id": r.hf_model_id,
+                    "backend_url": r.backend_url,
+                    "server_start_time": r.server_start_time,
+                    "speculative_decoding_enabled": (
+                        1 if r.speculative_decoding_enabled else 0
+                    ),
                 }
             )
         self.db["runs"].insert_all(rows)
@@ -518,7 +635,19 @@ class SQLiteStore:
 
         query += " ORDER BY created_at DESC"
 
-        return list(self.db.query(query, params))
+        rows = list(self.db.query(query, params))
+
+        # Auto-parse JSON text fields back to dicts
+        json_fields = {"score_secondary", "judge_dimensions"}
+        for row in rows:
+            for field in json_fields:
+                if field in row and isinstance(row[field], str):
+                    try:
+                        row[field] = json.loads(row[field])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+        return rows
 
     def get_run_summary(self, suite_id: str | None = None) -> list[dict[str, Any]]:
         """Get a summary grouped by model_alias."""
@@ -582,6 +711,18 @@ class SQLiteStore:
                     "created_at": result.created_at,
                     "context_tokens": result.context_tokens,
                     "estimated_prompt_tokens": result.estimated_prompt_tokens,
+                    # M14 identity stamp
+                    "requested_alias": result.requested_alias,
+                    "litellm_model_name": result.litellm_model_name,
+                    "openai_models_id": result.openai_models_id,
+                    "vllm_served_model_name": result.vllm_served_model_name,
+                    "vllm_container_name": result.vllm_container_name,
+                    "hf_model_id": result.hf_model_id,
+                    "backend_url": result.backend_url,
+                    "server_start_time": result.server_start_time,
+                    "speculative_decoding_enabled": (
+                        1 if result.speculative_decoding_enabled else 0
+                    ),
                 },
             )
         else:

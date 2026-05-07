@@ -4,15 +4,45 @@ Evaluates response quality, coding ability, instruction following, and performan
 
 ## Current Status
 
-**Phase:** Milestones M1–M13 complete. M14 (dashboard) next.
+**Phase:** Milestones M1–M16 complete. 372 tests pass.
 
-The `ROADMAP.md` defines 15 milestones across 4 phases. Detailed execution plans with library integration notes are in `milestones/`. Virtual environment and core dependencies are set up.
+The harness can answer:
+- Which local model should be the default for coding, debugging, long-context, quick snippets?
+- Does quantization hurt coding, reasoning, or formatting?
+- Does longer context improve or degrade quality?
+- Does REPL prompting help debugging?
+- Did a backend/model change cause a quality or performance regression?
+- How do local model scores compare to standard public benchmarks?
 
 ## Quick Start
 
 ```bash
 source .venv/bin/activate
-python -m bench_harness --help
+python -m bench_harness run --suite smoke --models agent-code
+```
+
+## CLI Reference
+
+```bash
+# Compare two benchmark runs for regressions
+bench-harness compare compare-runs-cmd \
+  runs/baseline/benchmark.db runs/candidate/benchmark.db
+
+# Generate a regression test suite from history
+bench-harness regression regression-suite --db runs/.../benchmark.db
+
+# Open analysis notebook
+bench-harness analyze notebook --db runs/.../benchmark.db
+
+# Export training data
+bench-harness export sft --suite coding_benchmark
+bench-harness export preference --suite coding_benchmark
+bench-harness export all --suite coding_benchmark
+```
+
+For public benchmark integration:
+```bash
+bench-harness run-lm-eval --suite public_baseline --models agent-code
 ```
 
 For analysis/dashboard work:
@@ -44,11 +74,12 @@ pip install -e ".[long-context]"
 | 8 | Prompt Style Comparison | B — Coding usefulness | **Done** |
 | 9 | Long-Context Benchmark Suite | C — Deep comparison | **Done** |
 | 10 | Quantization Comparison Suite | C — Deep comparison | **Done** |
-| 11 | Agent Safety and Command Discipline | C — Deep comparison | Not started |
+| 11 | Agent Safety and Command Discipline | C — Deep comparison | **Done** |
 | 12 | Report Generator v2 | C — Deep comparison | **Done** |
 | 13 | Training-Data Export | D — Data flywheel | **Done** |
-| 14 | Dashboard / Analysis Notebook | D — Data flywheel | Not started |
-| 15 | CI / Regression Mode | D — Data flywheel | Not started |
+| 14 | Dashboard / Analysis Notebook | D — Data flywheel | **Done** |
+| 15 | CI / Regression Mode | D — Data flywheel | **Done** |
+| 16 | Public Benchmark Integration | D — Data flywheel | **Done** |
 
 ## Build Order
 
@@ -79,14 +110,14 @@ python -m bench_harness run \
 | `unidiff` | M5 | Unified diff parsing for patches |
 | `bigcode-tools` | M5 (opt) | HumanEval/MBPP execution infrastructure |
 | `evalplus` | M5 (opt) | Deobfuscated coding test suites |
-| `lm-eval` | M6 (opt) | Public benchmark integration (MMLU, GPQA, BBH, etc.) |
-| `lm-evaluation-harness` | M6 (opt) | Standard eval harness |
+| `lm-eval` | M16 (opt) | Public benchmark integration (MMLU, GPQA, BBH, etc.) |
+| `lm-evaluation-harness` | M16 (opt) | Standard eval harness |
 | `shellingham` / `shlex` | M11 | Shell command parsing |
 | `pynvml` | M9 (opt) | GPU memory/utilization monitoring |
 | `transformers` | M9 (opt) | Tokenizer for context packing |
-| `duckdb` | M12 (opt) | SQL queries on SQLite for reports |
-| `matplotlib` / `seaborn` | M12/M14 (opt) | Chart generation |
-| `great-tables` | M12 (opt) | Polished report tables |
+| `duckdb` | M14 (opt) | Fast SQL queries on SQLite |
+| `pandas` | M14 (opt) | DataFrame analysis |
+| `matplotlib` / `seaborn` | M14 (opt) | Chart generation |
 
 ## Data Access
 

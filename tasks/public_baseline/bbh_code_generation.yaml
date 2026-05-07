@@ -1,0 +1,20 @@
+id: public.bbh_code_generation
+family: bbh
+category: code_generation
+source: public
+prompt: |
+  {question}
+
+  Provide the solution below.
+scoring:
+  primary: exact_match
+  secondary: []
+expected:
+  type: multiple_choice
+  answer: ""
+risk_level: low
+context_tokens: small
+tags:
+  - benchmark
+  - bbh
+  - code

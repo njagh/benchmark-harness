@@ -1274,7 +1274,7 @@ Measure quality and performance impact of quantization.
 
 ---
 
-# Milestone 11 — Agent safety and command discipline
+# Milestone 11 — Agent safety and command discipline **✅ DONE**
 
 ## Goal
 
@@ -1282,32 +1282,20 @@ Evaluate whether models behave safely when suggesting shell or coding-agent acti
 
 ## Tasks
 
-* Build command safety classifier.
-* Define risky command categories.
-* Add tasks with tempting unsafe commands.
-* Score inspection-before-mutation behavior.
-* Score backup/git-status recommendations.
-* Score refusal or confirmation behavior.
-* Add shell command parser.
-
-Risk categories:
-
-```text
-broad deletion
-permission escalation
-secret exposure
-network install
-force push
-history rewrite
-destructive docker prune
-blind file overwrite
-```
+* [x] Implement `command_safety` scorer with 8 risk categories (broad_deletion, permission_escalation, secret_exposure, network_install, force_push, history_rewrite, destructive_docker, blind_file_overwrite)
+* [x] Create 8 safety tasks across 4 families (deletion_safety, permission_safety, secret_safety, git_safety)
+* [x] Score inspection-before-mutation behavior via regex-based command classification
+* [x] Score refusal or confirmation behavior patterns
+* [x] Add `safety_score` and `safety_details` to RunResult and SQLite schema
+* [x] Add safety flags to failure analysis report section
+* [x] Add `agent_safety` suite to configs/suites.yaml
 
 ## Acceptance criteria
 
-* Safety score appears in reports.
-* Unsafe command examples are extracted.
-* Prompt changes can be measured for safety impact.
+* [x] Safety score appears in reports.
+* [x] Unsafe command examples are extracted and classified.
+* [x] Prompt changes can be measured for safety impact.
+* [x] 8 tasks across 4 families (deletion, permission, secret, git safety).
 
 ---
 
@@ -1391,20 +1379,26 @@ judge_scores.jsonl
 
 ---
 
-# Milestone 14 — Dashboard / analysis notebook
+# Milestone 14 — Dashboard / analysis notebook **✅ DONE**
 
 ## Goal
 
-Provide interactive analysis for repeated experiments.
+Provide interactive analysis for repeated experiments using pandas + DuckDB + matplotlib/seaborn.
 
 ## Tasks
 
-* Add DuckDB or Pandas analysis notebook.
-* Add charts for score vs latency.
-* Add context-length degradation curves.
-* Add quantization comparison plots.
-* Add prompt-style comparison plots.
-* Add failure examples browser.
+* [x] Create `analysis.py` module with DataFrame query builders
+* [x] `runs_to_df()` — load SQLite into pandas, auto-parse JSON fields
+* [x] `timing_summary_df()` — per-model timing aggregates (mean/min/max/p95)
+* [x] `quantization_comparison_df()` — score by quantization level per model
+* [x] `context_degradation_df()` — quality vs context length with bucketed bins
+* [x] `score_variance_df()` — discriminating tasks ranked by score variance
+* [x] `style_comparison_df()` — score by prompt style with pivot-ready data
+* [x] `failures_df()` — failed runs grouped by error pattern
+* [x] `identify_mismatches()` — detect alias-vs-actual model mismatches
+* [x] `query_duck()` — run raw DuckDB SQL on SQLite database
+* [x] Create `notebooks/bench_dashboard.ipynb` with 11 interactive sections
+* [x] Add `bench-harness analyze notebook` CLI command
 
 ## Acceptance criteria
 
@@ -1414,7 +1408,7 @@ Provide interactive analysis for repeated experiments.
 
 ---
 
-# Milestone 15 — CI / regression mode
+# Milestone 15 — CI / regression mode **✅ DONE**
 
 ## Goal
 
@@ -1422,11 +1416,15 @@ Use the harness as a regression test system for model/backend changes.
 
 ## Tasks
 
-* Add `quick_regression` suite.
-* Add baseline comparison thresholds.
-* Add pass/fail gates.
-* Add command-line diff against previous run.
-* Add optional GitHub Actions support for non-GPU tests.
+* [x] Implement `compare_runs()` — compare two benchmark.db files
+* [x] Detect quality regressions (score delta beyond threshold)
+* [x] Detect performance regressions (wall time ± threshold, tokens/sec ± threshold)
+* [x] Detect crash changes (task present in one but not the other)
+* [x] `bench-harness compare compare-runs-cmd baseline_db candidate_db` CLI
+* [x] `generate_regression_suite()` — auto-generate YAML suite from history
+* [x] Selects highest-variance tasks + all failed tasks
+* [x] `bench-harness regression regression-suite --db <path>` CLI
+* [x] Formatted rich table output for regression/progress flags
 
 ## Acceptance criteria
 
@@ -1441,6 +1439,30 @@ python -m bench_harness compare \
   --baseline runs/2026-05-01-agent-code-baseline \
   --candidate runs/2026-05-04-agent-code-new-kernel
 ```
+
+---
+
+# Milestone 16 — Public benchmark integration **✅ DONE**
+
+## Goal
+
+Run standard public benchmark subsets (MMLU, GPQA, BBH, MATH) against local models via lm-evaluation-harness, storing summarized metrics alongside local workload results.
+
+## Tasks
+
+* [x] Implement `lm_eval_adapter.py` — thin wrapper around lm_eval with graceful fallback
+* [x] Support 5 benchmark subsets: mmlu_college_math, mmlu_high_school_cs, mmlu_machine_learning, gpqa_diamond, bbh_code_generation
+* [x] Add `bench-harness run-lm-eval` CLI subcommand
+* [x] Create `tasks/public_baseline/` with 5 task YAML wrappers
+* [x] Add `public_baseline` suite to configs/suites.yaml
+* [x] Add "Public Baseline Scores" section to v2 report with disclaimer
+* [x] Store results in existing SQLite schema (no new tables)
+
+## Acceptance criteria
+
+* [x] Standard benchmark scores appear in reports alongside local task scores.
+* [x] lm_eval is optional — harness works without it, shows clear error.
+* [x] Report clearly distinguishes public benchmark scores from local workload scores.
 
 ---
 
@@ -1482,8 +1504,11 @@ Outcome: can decide whether slower or quantized models are worth it.
 2. Add pairwise comparison.
 3. Add training-data export.
 4. Add regression suite generation.
+5. Add dashboard / analysis notebook.
+6. Add CI / regression comparison mode.
+7. Add public benchmark integration.
 
-Outcome: benchmark failures become training data and regression tests.
+Outcome: benchmark failures become training data and regression tests. Users can compare runs, generate regression suites, explore results interactively, and compare against standard benchmarks.
 
 ---
 
@@ -1533,14 +1558,16 @@ Outcome: benchmark failures become training data and regression tests.
 
 ## 11.5 Later priority
 
-* [ ] Add LLM judge scoring.
-* [ ] Add pairwise preference scoring.
-* [ ] Add long-context context packer.
-* [ ] Add quantization comparison reports.
-* [ ] Add command safety classifier.
+* [x] Add LLM judge scoring.
+* [x] Add pairwise preference scoring.
+* [x] Add long-context context packer.
+* [x] Add quantization comparison reports.
+* [x] Add command safety classifier.
 * [x] Add SFT export.
 * [x] Add DPO export.
-* [ ] Add dashboard or notebook.
+* [x] Add dashboard or notebook.
+* [x] Add CI / regression comparison.
+* [x] Add public benchmark integration.
 
 ---
 
@@ -1737,8 +1764,8 @@ Potential later features:
 * add benchmark result cards for Open WebUI
 * add automatic prompt optimization loop
 * add human review UI
-* add DPO/ORPO export
-* add LoRA fine-tuning handoff scripts
+* [x] Add DPO export.
+* [ ] Add LoRA fine-tuning handoff scripts.
 
 ---
 

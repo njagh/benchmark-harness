@@ -60,6 +60,20 @@ class RunResult:
         human_override: Whether human overrode the judge score (M7).
         human_score: Human-provided override score (M7).
         human_note: Human reviewer note (M7).
+        prompt_style: Prompt style used (M8).
+        context_tokens: Context size bucket (M9).
+        estimated_prompt_tokens: Estimated prompt token count (M9).
+        quantization: Model quantization (M10).
+        requested_alias: Model alias from configs/models.yaml (M14 identity stamp).
+        litellm_model_name: Actual model name sent to API (M14).
+        openai_models_id: Returned model id from /v1/models (M14).
+        vllm_served_model_name: served_model_name from vLLM (M14).
+        vllm_container_name: Container name (M14).
+        hf_model_id: HuggingFace model ID (M14).
+        backend_url: Backend URL used for this run (M14).
+        server_start_time: Server start time from /v1/models (M14).
+        speculative_decoding_enabled: Speculative decoding flag (M14).
+        safety_score: Command safety score (M11) — 1.0 = all safe, 0.0 = all dangerous.
     """
 
     run_id: str
@@ -110,6 +124,21 @@ class RunResult:
     context_tokens: str | None = None  # Context size bucket
     estimated_prompt_tokens: int | None = None  # Estimated prompt token count
     quantization: str | None = None  # Model quantization (e.g., "FP8", "GPTQ-Int4", "FP16")
+    # M11 command safety score
+    safety_score: float | None = None  # Command safety score (M11)
+    safety_details: dict[str, Any] | None = None  # Safety classification details (M11)
+    # M14 identity stamp: before each task, harness calls /v1/models and records
+    # actual returned model id plus the backend URL/container expected for that alias.
+    # This makes "qwen-dense served as agent-code" obvious instead of inferential.
+    requested_alias: str | None = None  # alias from configs/models.yaml
+    litellm_model_name: str | None = None  # model name sent to API call
+    openai_models_id: str | None = None  # returned id from /v1/models response
+    vllm_served_model_name: str | None = None  # served_model_name from vLLM /v1/models
+    vllm_container_name: str | None = None  # container name if available
+    hf_model_id: str | None = None  # HuggingFace model ID if available
+    backend_url: str | None = None  # the backend URL this run used
+    server_start_time: str | None = None  # server_start_time from /v1/models if available
+    speculative_decoding_enabled: bool | None = None  # whether speculative decoding is enabled
 
 
 def build_messages(task: dict, prompt: str) -> list[dict]:
@@ -177,6 +206,17 @@ class CompletionRunner:
         max_tokens = params.get("max_tokens", 4096)
         context_tokens = params.get("context_tokens", task.get("context_tokens", "small"))
         estimated_prompt_tokens = params.get("estimated_prompt_tokens")
+
+        # Extract identity stamp fields from params (populated by CLI before each task)
+        requested_alias = params.get("requested_alias", model_alias)
+        litellm_model_name = params.get("litellm_model_name")
+        openai_models_id = params.get("openai_models_id")
+        vllm_served_model_name = params.get("vllm_served_model_name")
+        vllm_container_name = params.get("vllm_container_name")
+        hf_model_id = params.get("hf_model_id")
+        backend_url = params.get("backend_url")
+        server_start_time = params.get("server_start_time")
+        speculative_decoding_enabled = params.get("speculative_decoding_enabled")
 
         scorer_version: str | None = None
         start_time = datetime.now(timezone.utc)
@@ -295,6 +335,21 @@ class CompletionRunner:
                             logger.warning(
                                 "Secondary scorer '%s' failed: %s", sec_name, e
                             )
+
+                    # Run command_safety scorer if configured
+                    safety_score_val: float | None = None
+                    safety_details: dict[str, Any] | None = None
+                    for sec_name in (secondary_scorer_names or []):
+                        if sec_name == "command_safety":
+                            try:
+                                sec_scorer = get_scorer(sec_name)
+                                sec_result = sec_scorer.score(task_dict, content)
+                                safety_score_val = sec_result.score
+                                safety_details = sec_result.details
+                            except Exception as e:
+                                logger.warning(
+                                    "Command safety scorer failed: %s", e
+                                )
                 except Exception as e:
                     logger.warning("Scoring failed for task %s: %s", task_id, e)
 
@@ -328,6 +383,21 @@ class CompletionRunner:
                 prompt_style=params.get("prompt_style"),
                 context_tokens=context_tokens,
                 estimated_prompt_tokens=estimated_prompt_tokens,
+                # M10 quantization
+                quantization=params.get("quantization"),
+                # M11 command safety
+                safety_score=safety_score_val,
+                safety_details=safety_details,
+                # M14 identity stamp
+                requested_alias=requested_alias,
+                litellm_model_name=litellm_model_name,
+                openai_models_id=openai_models_id,
+                vllm_served_model_name=vllm_served_model_name,
+                vllm_container_name=vllm_container_name,
+                hf_model_id=hf_model_id,
+                backend_url=backend_url,
+                server_start_time=server_start_time,
+                speculative_decoding_enabled=speculative_decoding_enabled,
             )
 
         except Exception as e:
@@ -349,6 +419,20 @@ class CompletionRunner:
                 prompt_style=params.get("prompt_style"),
                 context_tokens=context_tokens,
                 estimated_prompt_tokens=estimated_prompt_tokens,
+                quantization=params.get("quantization"),
+                # M11 command safety
+                safety_score=safety_score_val,
+                safety_details=safety_details,
+                # M14 identity stamp
+                requested_alias=requested_alias,
+                litellm_model_name=litellm_model_name,
+                openai_models_id=openai_models_id,
+                vllm_served_model_name=vllm_served_model_name,
+                vllm_container_name=vllm_container_name,
+                hf_model_id=hf_model_id,
+                backend_url=backend_url,
+                server_start_time=server_start_time,
+                speculative_decoding_enabled=speculative_decoding_enabled,
             )
 
         return result
@@ -372,6 +456,23 @@ class CompletionRunner:
         """
         import time as _time
 
+        temperature = params.get("temperature", 0)
+        max_tokens = params.get("max_tokens", 4096)
+        quantization = params.get("quantization")
+        context_tokens = params.get("context_tokens", task.get("context_tokens", "small"))
+        estimated_prompt_tokens = params.get("estimated_prompt_tokens")
+
+        # Extract identity stamp fields from params
+        requested_alias = params.get("requested_alias", model_alias)
+        litellm_model_name = params.get("litellm_model_name")
+        openai_models_id = params.get("openai_models_id")
+        vllm_served_model_name = params.get("vllm_served_model_name")
+        vllm_container_name = params.get("vllm_container_name")
+        hf_model_id = params.get("hf_model_id")
+        backend_url = params.get("backend_url")
+        server_start_time = params.get("server_start_time")
+        speculative_decoding_enabled = params.get("speculative_decoding_enabled")
+
         try:
             # Step 1: Call the model to generate code (using system message if present)
             messages = build_messages(task, prompt)
@@ -379,8 +480,8 @@ class CompletionRunner:
 
             response = await self.client.chat_complete(
                 messages=messages,
-                temperature=temperature if "temperature" in params else 0,
-                max_tokens=max_tokens if "max_tokens" in params else 4096,
+                temperature=temperature,
+                max_tokens=max_tokens,
             )
 
             api_end = _time.perf_counter()
@@ -442,6 +543,7 @@ class CompletionRunner:
                 try:
                     task_dict = {
                         "id": task_id,
+                        "family": task.get("family", "coding"),
                         "scoring": task.get("scoring", {}),
                         "expected": task.get("expected", {}),
                         "code_type": task.get("code_type"),
@@ -497,6 +599,17 @@ class CompletionRunner:
                 prompt_style=params.get("prompt_style"),
                 context_tokens=context_tokens,
                 estimated_prompt_tokens=estimated_prompt_tokens,
+                quantization=quantization,
+                # M14 identity stamp
+                requested_alias=requested_alias,
+                litellm_model_name=litellm_model_name,
+                openai_models_id=openai_models_id,
+                vllm_served_model_name=vllm_served_model_name,
+                vllm_container_name=vllm_container_name,
+                hf_model_id=hf_model_id,
+                backend_url=backend_url,
+                server_start_time=server_start_time,
+                speculative_decoding_enabled=speculative_decoding_enabled,
             )
 
         except Exception as e:
@@ -517,6 +630,16 @@ class CompletionRunner:
                 created_at=start_time.isoformat(),
                 prompt_style=params.get("prompt_style"),
                 quantization=quantization,
+                # M14 identity stamp
+                requested_alias=requested_alias,
+                litellm_model_name=litellm_model_name,
+                openai_models_id=openai_models_id,
+                vllm_served_model_name=vllm_served_model_name,
+                vllm_container_name=vllm_container_name,
+                hf_model_id=hf_model_id,
+                backend_url=backend_url,
+                server_start_time=server_start_time,
+                speculative_decoding_enabled=speculative_decoding_enabled,
             )
 
         return result

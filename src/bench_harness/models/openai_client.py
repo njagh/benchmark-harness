@@ -138,3 +138,36 @@ class OpenAICompatClient:
             logger.error("Stream API error: %s", e)
         except Exception as e:
             logger.error("Unexpected stream error: %s", e)
+
+    async def fetch_models(self) -> dict[str, Any]:
+        """Call /v1/models and return the raw response.
+
+        Returns:
+            Dict with keys: data (list of model objects), object (usually 'list').
+            Each model object has id, object, owned_by, etc.
+            On error returns {'error': str}.
+        """
+        try:
+            models_list = await self.client.models.list()
+            models_data = []
+            for m in models_list.data:
+                models_data.append({
+                    "id": m.id,
+                    "object": m.object,
+                    "owned_by": m.owned_by,
+                })
+            result = {
+                "data": models_data,
+                "object": models_list.object if hasattr(models_list, "object") else "list",
+            }
+            logger.info(
+                "fetched /v1/models: %d models available",
+                len(models_data),
+            )
+            return result
+        except (APIConnectionError, APITimeoutError) as e:
+            logger.error("Error fetching /v1/models: %s", e)
+            return {"error": str(e)}
+        except Exception as e:
+            logger.error("Unexpected error in fetch_models: %s", e)
+            return {"error": str(e)}

@@ -185,6 +185,25 @@ class CodeTaskRunner:
                 run_dir=run_dir,
             )
 
+    def _extract_code_from_fence(self, code: str) -> str:
+        """Extract Python code from markdown fenced code blocks.
+        
+        Strips ```python ... ``` wrappers. Falls through unchanged
+        if no fences detected.
+        """
+        stripped = code.strip()
+        if stripped.startswith("```"):
+            lines = stripped.splitlines()
+            # Remove first line (fence marker like ```python)
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            # Remove last line (closing fence)
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            return "\n".join(lines) + "\n"
+        # No fences — preserve original code with its trailing newline
+        return code
+
     def _run_function_completion(
         self,
         run_dir: str,
@@ -200,6 +219,8 @@ class CodeTaskRunner:
         runs pytest, and returns results.
         """
         task_id = task.get("id", "unknown")
+        # Strip markdown code fences if present
+        generated_code = self._extract_code_from_fence(generated_code)
         generated_path = os.path.join(run_dir, "generated_code.py")
         test_path = os.path.join(run_dir, "test_generated.py")
 
@@ -207,8 +228,11 @@ class CodeTaskRunner:
         with open(generated_path, "w") as f:
             f.write(generated_code)
 
+        code_type = task.get("code_type", "function_completion")
         # Build the test file content
-        test_content = self._build_test_file(test_code, entry_point)
+        test_content = self._build_test_file(
+            test_code, entry_point, rewrite_imports=(code_type == "function_completion")
+        )
         with open(test_path, "w") as f:
             f.write(test_content)
 
@@ -370,7 +394,8 @@ class CodeTaskRunner:
         # Now run tests on the patched code
         test_path = os.path.join(run_dir, "test_generated.py")
         test_content = self._build_test_file(
-            test_code, entry_point, additional_paths=["src"]
+            test_code, entry_point, additional_paths=["src"],
+            rewrite_imports=False,
         )
         with open(test_path, "w") as f:
             f.write(test_content)
@@ -445,60 +470,57 @@ class CodeTaskRunner:
         test_code: str,
         entry_point: str | None,
         additional_paths: list[str] | None = None,
+        rewrite_imports: bool = True,
     ) -> str:
         """Build a pytest test file from the test_code specification.
 
         If test_code is empty, generates a basic test that imports the
         module and verifies the entry point exists.
+
+        When rewrite_imports is True (function completion tasks), imports
+        like ``from benchmark_000 import func`` are rewritten to
+        ``from generated_code import func`` since generated code is
+        always written to generated_code.py in the temp directory.
+        When False (patch tasks), imports are preserved as-is since
+        the patch applies to existing files that are imported by name.
         """
-        if additional_paths:
-            path_inject = "\n".join(
-                f"sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), {p!r}))"
-                for p in additional_paths
-            )
-            path_header = f"""import sys
+        # Ensure generated_code.py is importable
+        sys_header = """import sys
 import os
-{path_inject}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 """
-        else:
-            path_header = ""
 
         if test_code:
-            if test_code.strip().startswith("import ") or test_code.strip().startswith("from "):
-                combined = path_header + textwrap.dedent(test_code)
-                return combined
+            if rewrite_imports:
+                import re
+                rewritten = re.sub(
+                    r'from\s+[\w_]+\s+import\s+',
+                    'from generated_code import ',
+                    test_code,
+                )
+                return sys_header + textwrap.dedent(rewritten)
 
-            combined = path_header + test_code
-            return combined
+            # For patch tasks, preserve imports as-is
+            return sys_header + textwrap.dedent(test_code)
 
         # Generate a minimal test file when no test_code is provided
-        test_file = path_header + textwrap.dedent(
+        test_file = sys_header + textwrap.dedent(
             """\
-            import importlib
-            import sys
-            import os
-
-            # Ensure the module can be loaded from the current directory
-            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-            def test_module_imports():
-                \"\"\"Verify the generated module can be imported.\"\"\"
-                import generated_code
-                assert generated_code is not None, "Module did not import successfully"
-
+            import generated_code
+            assert generated_code is not None, "Module did not import successfully"
             """
         )
 
         if entry_point:
             test_file += textwrap.dedent(
                 f"""\
-                def test_entry_point_exists():
-                    \"\"\"Verify the expected function/class exists.\"\"\"
-                    import generated_code
-                    assert hasattr(generated_code, "{entry_point}"), (
-                        f"Expected entry point '{entry_point}' not found in generated_code"
-                    )
-                """
+            def test_entry_point_exists():
+                \"\"\"Verify the expected function/class exists.\"\"\"
+                assert hasattr(generated_code, "{entry_point}"), (
+                    f"Expected entry point '{entry_point}' not found in generated_code"
+                )
+            """
             )
 
         return test_file

@@ -185,10 +185,10 @@ def _generate_legacy_report(
             task_id = r.get("task_id", "unknown")
             alias = r.get("model_alias", "unknown")
             primary = r.get("score_primary", 0)
-            sec_scores = r.get("score_secondary", {})
+            sec_scores = r.get("score_secondary", {}) or {}
             sec_str = ", ".join(
-                f"{k}={v.get('score', '?')}"
-                for k, v in (sec_scores or {}).items()
+                f"{k}={v.get('score', '?') if isinstance(v, dict) else v}"
+                for k, v in sec_scores.items()
             ) or "-"
             explanation = (r.get("score_explanation") or "").replace("\n", " ")
             lines.append(

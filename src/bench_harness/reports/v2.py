@@ -534,7 +534,7 @@ def _append_failure_analysis(
     lines: list[str],
     model_stats: dict[str, list[dict[str, Any]]],
 ) -> None:
-    """Append Failure Clustering section."""
+    """Append Failure Clustering section with safety flag detection."""
     all_runs = [r for runs in model_stats.values() for r in runs]
     clusters = cluster_failures(all_runs)
 
@@ -546,6 +546,29 @@ def _append_failure_analysis(
     lines.append("Failed runs grouped by error pattern:")
     lines.append("")
 
+    # Detect tasks with safety flags
+    safety_flagged_runs = [
+        r for r in all_runs
+        if r.get("safety_score") is not None and r["safety_score"] < 1.0
+    ]
+
+    if safety_flagged_runs:
+        lines.append("### Safety Flags")
+        lines.append("")
+        lines.append(
+            f"{len(safety_flagged_runs)} run(s) flagged for unsafe commands "
+            f"(safety_score < 1.0):"
+        )
+        lines.append("")
+        for sr in safety_flagged_runs[:20]:
+            alias = sr.get("model_alias", "unknown")
+            task_id = sr.get("task_id", "unknown")
+            score = sr.get("safety_score", 0.0)
+            lines.append(
+                f"- `{task_id}` on `{alias}` — safety_score: **{score:.4f}**"
+            )
+        lines.append("")
+
     for cluster_name, cluster_runs in sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True):
         # Truncate long cluster names
         display_name = cluster_name[:60]
@@ -555,7 +578,13 @@ def _append_failure_analysis(
         for cr in cluster_runs:
             alias = cr.get("model_alias", "unknown")
             task_id = cr.get("task_id", "unknown")
-            lines.append(f"  - `{task_id}` on `{alias}`")
+            safety = cr.get("safety_score")
+            if safety is not None and safety < 1.0:
+                lines.append(
+                    f"  - `{task_id}` on `{alias}` [safety_score={safety:.4f}]"
+                )
+            else:
+                lines.append(f"  - `{task_id}` on `{alias}`")
 
     lines.append("")
 
@@ -636,6 +665,146 @@ def _append_discriminating_tasks(
     lines.append("")
 
 
+def _append_public_baseline_scores(
+    lines: list[str],
+    runs: list[dict[str, Any]],
+    model_stats: dict[str, list[dict[str, Any]]],
+) -> None:
+    """Append Public Baseline Scores section for lm_eval results.
+
+    Shows standard benchmark scores (MMLU, GPQA, BBH, MATH) alongside
+    local task scores, with a clear disclaimer.
+    """
+    # Filter for public benchmark runs (task_id starts with "public.")
+    public_runs = [r for r in runs if r.get("task_id", "").startswith("public.")]
+
+    if not public_runs:
+        lines.append("## Public Baseline Scores")
+        lines.append("")
+        lines.append("_No public benchmark results available. Run with `bench-harness run-lm-eval` to populate._")
+        lines.append("")
+        lines.append(
+            "> These are public benchmark scores (may not reflect real workflow performance). "
+            "They measure general capability on standardized tasks, not specific workflow quality."
+        )
+        lines.append("")
+        return
+
+    lines.append("## Public Baseline Scores")
+    lines.append("")
+    lines.append(
+        "> These are public benchmark scores (may not reflect real workflow performance). "
+        "They measure general capability on standardized tasks, not specific workflow quality."
+    )
+    lines.append("")
+
+    # Group public runs by model
+    public_by_model: dict[str, list[dict[str, Any]]] = {}
+    for r in public_runs:
+        alias = r.get("model_alias", "unknown")
+        if alias not in public_by_model:
+            public_by_model[alias] = []
+        public_by_model[alias].append(r)
+
+    lines.append("| Task | Model | Accuracy | Samples |")
+    lines.append("|---|---|---|---|")
+
+    for alias in sorted(public_by_model.keys()):
+        model_runs = public_by_model[alias]
+        for r in sorted(model_runs, key=lambda x: x.get("task_id", "")):
+            task_id = r.get("task_id", "unknown")
+            # Remove "public." prefix for display
+            display_task = task_id.replace("public.", "", 1)
+            score = r.get("score_primary")
+            score_str = f"{score:.4f}" if score is not None else "N/A"
+            samples = r.get("score_secondary")
+            if isinstance(samples, str):
+                try:
+                    import json
+                    samples = json.loads(samples)
+                except (json.JSONDecodeError, TypeError):
+                    samples = {}
+            if isinstance(samples, dict):
+                samples_str = samples.get("samples_run", "?")
+            else:
+                samples_str = "?"
+            lines.append(
+                f"| {display_task} | {alias} | {score_str} | {samples_str} |"
+            )
+
+    lines.append("")
+
+
+def _append_identity_stamp(lines: list[str], runs: list[dict[str, Any]]) -> None:
+    """Append model identity verification section.
+
+    Shows alias vs actual served model, revealing when a model alias maps
+    to a different model on the server (e.g., 'qwen-dense served as agent-code').
+    """
+    # Collect runs with identity stamp data
+    identity_runs = [r for r in runs if r.get("openai_models_id") or r.get("vllm_served_model_name")]
+    if not identity_runs:
+        lines.append("## Model Identity Stamp")
+        lines.append("")
+        lines.append("_No identity stamp data available (model not queried via /v1/models)._")
+        lines.append("")
+        return
+
+    lines.append("## Model Identity Stamp")
+    lines.append("")
+    lines.append(
+        "Before each task, the harness calls `/v1/models` to verify which model "
+        "the backend actually serves. This reveals when an alias (e.g., `qwen-dense`) "
+        "maps to a different model on the server."
+    )
+    lines.append("")
+
+    # Group by (model_alias, openai_models_id) to show alias vs actual mapping
+    from collections import defaultdict
+    alias_vs_actual: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for r in identity_runs:
+        alias = r.get("model_alias", "unknown")
+        actual_id = r.get("openai_models_id") or r.get("vllm_served_model_name") or "(none)"
+        alias_vs_actual[alias][actual_id] += 1
+
+    lines.append("| Alias | Actual Model ID | Served Model Name | Container | HF Model ID | Backend URL | Runs |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for alias in sorted(alias_vs_actual.keys()):
+        for actual_id, count in sorted(alias_vs_actual[alias].items()):
+            # Get other fields from a matching run
+            sample_run = next(r for r in identity_runs if r.get("model_alias") == alias and r.get("openai_models_id") == actual_id)
+            served = sample_run.get("vllm_served_model_name") or ""
+            container = sample_run.get("vllm_container_name") or ""
+            hf = sample_run.get("hf_model_id") or ""
+            url = sample_run.get("backend_url") or ""
+            lines.append(
+                f"| {alias} "
+                f"| {actual_id} "
+                f"| {served} "
+                f"| {container} "
+                f"| {hf} "
+                f"| {url} "
+                f"| {count} |"
+            )
+    lines.append("")
+
+    # Highlight mismatches
+    mismatches = []
+    for alias, actuals in alias_vs_actual.items():
+        for actual_id in actuals:
+            if actual_id != alias:
+                mismatches.append((alias, actual_id))
+
+    if mismatches:
+        lines.append("### ⚠️ Alias Mismatches Detected")
+        lines.append("")
+        lines.append("The following aliases do not match the actual model served:")
+        lines.append("")
+        for alias, actual in mismatches:
+            lines.append(f"- **{alias}** → served as **{actual}**")
+        lines.append("")
+
+
 def generate_report_v2(
     runs: list[dict[str, Any]],
     suite_id: str,
@@ -708,6 +877,8 @@ def generate_report_v2(
         "failure_analysis",
         "regression_detection",
         "discriminating_tasks",
+        "public_baseline",
+        "identity_stamp",
     ]
 
     active_sections = sections if sections is not None else default_sections
@@ -726,6 +897,8 @@ def generate_report_v2(
             lines, runs, prior_runs or []
         ),
         "discriminating_tasks": lambda: _append_discriminating_tasks(lines, model_stats),
+        "public_baseline": lambda: _append_public_baseline_scores(lines, runs, model_stats),
+        "identity_stamp": lambda: _append_identity_stamp(lines, runs),
     }
 
     for section_name in active_sections:

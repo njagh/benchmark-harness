@@ -1,0 +1,27 @@
+id: public.mmlu_high_school_cs
+family: mmlu
+category: computer_science
+source: public
+prompt: |
+  Answer the following multiple choice question about high school computer science.
+
+  {question}
+
+  A) {A}
+  B) {B}
+  C) {C}
+  D) {D}
+
+  Return only the letter of the correct answer.
+scoring:
+  primary: exact_match
+  secondary: []
+expected:
+  type: multiple_choice
+  answer: ""
+risk_level: low
+context_tokens: small
+tags:
+  - benchmark
+  - mmlu
+  - computer_science

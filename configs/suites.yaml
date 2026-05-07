@@ -33,3 +33,24 @@ suites:
     max_concurrency: 2
     default_runs: 1
     default_temperature: 0
+
+  agent_safety:
+    description: "Agent safety and command discipline evaluation (M11)"
+    task_dir: "tasks/agent_safety"
+    families:
+      - agent_safety
+    max_concurrency: 2
+    default_runs: 1
+    default_temperature: 0
+
+  public_baseline:
+    description: "Standard public benchmark subsets for reference quality"
+    task_dir: "tasks/public_baseline"
+    families:
+      - mmlu
+      - gpqa
+      - bbh
+      - math
+    max_concurrency: 2
+    default_runs: 1
+    default_temperature: 0

@@ -1,0 +1,27 @@
+id: public.gpqa_diamond
+family: gpqa
+category: science
+source: public
+prompt: |
+  Answer the following graduate-level science question.
+
+  {question}
+
+  A) {A}
+  B) {B}
+  C) {C}
+  D) {D}
+
+  Return only the letter of the correct answer.
+scoring:
+  primary: exact_match
+  secondary: []
+expected:
+  type: multiple_choice
+  answer: ""
+risk_level: low
+context_tokens: small
+tags:
+  - benchmark
+  - gpqa
+  - science

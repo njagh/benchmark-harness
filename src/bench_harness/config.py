@@ -92,7 +92,15 @@ def get_suite(config: dict[str, Any], name: str) -> dict[str, Any] | None:
     max_concurrency, default_runs, default_temperature.
     """
     suites = config.get("suites", {})
-    return suites.get(name)
+    # Normalize hyphens to underscores for CLI compatibility
+    normalized_name = name.replace("-", "_")
+    # Direct match first, then normalized lookup
+    if normalized_name in suites:
+        return suites[normalized_name]
+    for key, val in suites.items():
+        if key.replace("-", "_") == normalized_name:
+            return val
+    return None
 
 
 def load_dataset_config(path: str | None = None) -> dict[str, Any]:

@@ -20,6 +20,7 @@ from bench_harness.scorers import unit_test
 from bench_harness.scorers import config_valid
 from bench_harness.scorers import llm_judge
 from bench_harness.scorers import pairwise
+from bench_harness.scorers import command_safety
 
 __all__ = [
     "BaseScorer",
@@ -38,4 +39,5 @@ __all__ = [
     "config_valid",
     "llm_judge",
     "pairwise",
+    "command_safety",
 ]

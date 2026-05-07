@@ -1,0 +1,27 @@
+id: public.mmlu_machine_learning
+family: mmlu
+category: machine_learning
+source: public
+prompt: |
+  Answer the following multiple choice question about machine learning.
+
+  {question}
+
+  A) {A}
+  B) {B}
+  C) {C}
+  D) {D}
+
+  Return only the letter of the correct answer.
+scoring:
+  primary: exact_match
+  secondary: []
+expected:
+  type: multiple_choice
+  answer: ""
+risk_level: low
+context_tokens: small
+tags:
+  - benchmark
+  - mmlu
+  - machine_learning

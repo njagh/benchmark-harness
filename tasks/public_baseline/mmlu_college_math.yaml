@@ -1,0 +1,27 @@
+id: public.mmlu_college_math
+family: mmlu
+category: mathematics
+source: public
+prompt: |
+  Answer the following multiple choice question about college-level mathematics.
+
+  {question}
+
+  A) {A}
+  B) {B}
+  C) {C}
+  D) {D}
+
+  Return only the letter of the correct answer.
+scoring:
+  primary: exact_match
+  secondary: []
+expected:
+  type: multiple_choice
+  answer: ""
+risk_level: low
+context_tokens: small
+tags:
+  - benchmark
+  - mmlu
+  - mathematics
