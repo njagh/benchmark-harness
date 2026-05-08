@@ -536,8 +536,36 @@ class CompletionRunner:
 
             code_result = self._run_code_task_sync(task, generated_code, runner_params)
 
-            # Step 3: Run secondary scorers on generated code
+            # Run primary scorer from task spec (e.g. "contains") if CodeTaskRunner
+            # returned 0.0 and the primary scorer is NOT "unit_test".
+            # This handles patch_generation tasks that rely on pattern matching
+            # rather than test execution.
             primary_scorer_name = task.get("scoring", {}).get("primary", "")
+            if (code_result.get("score_primary", 0.0) == 0.0
+                    and primary_scorer_name
+                    and primary_scorer_name not in ("unit_test", "")):
+                from bench_harness.scorers import get_scorer
+                task_dict = {
+                    "id": task_id,
+                    "family": task.get("family", "coding"),
+                    "scoring": task.get("scoring", {}),
+                    "expected": task.get("expected", {}),
+                    "code_type": task.get("code_type"),
+                }
+                try:
+                    scorer = get_scorer(primary_scorer_name)
+                    score_res = scorer.score(task_dict, generated_code)
+                    code_result["score_primary"] = score_res.score
+                    code_result["score_explanation"] = score_res.explanation
+                    code_result["scorer_version"] = score_res.scorer_version
+                    code_result["primary_scorer"] = primary_scorer_name
+                except Exception as e:
+                    logger.warning(
+                        "Primary scorer '%s' failed for task %s: %s",
+                        primary_scorer_name, task_id, e,
+                    )
+
+            # Step 3: Run secondary scorers on generated code
             secondary_scorer_names = task.get("scoring", {}).get("secondary", [])
             secondary_scores: dict[str, Any] = {}
 

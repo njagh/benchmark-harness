@@ -61,9 +61,11 @@ class OpenAICompatibleRunner(RuntimeRunner):
         return False
 
     def run_workload(self, spec: RunSpec, prep: dict, result_dir: Path) -> RunResult:
+        model_name = prep["model_name"]
         client = OpenAICompatClient(
             base_url=prep["endpoint"],
             api_key=spec.runtime.args.get("api_key", "not-needed"),
+            model=model_name,
         )
         runner = CompletionRunner(client, fallback_tokenizer=None)
 

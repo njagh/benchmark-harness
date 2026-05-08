@@ -1,0 +1,36 @@
+schema_version: llm_bench.run_spec.v1
+
+name: qwen36-fast-local-coding-agent
+project: benchmark-harness
+tags:
+  - openai-compatible
+  - local-coding-agent
+  - docker-compose
+  - litellm
+  - git
+  - qwen36
+
+artifact:
+  kind: openai_endpoint
+  mode: external_path
+  path: http://127.0.0.1:4000/v1
+  model_id: qwen36-fast
+
+runtime:
+  kind: openai_compatible
+  launch: existing
+  host: 127.0.0.1
+  port: 4000
+  model_name: qwen36-fast
+
+workload:
+  prompt_suite: local_coding_agent
+  task_dir: tasks/local_coding_agent_v1
+  max_tokens: 512
+  temperature: 0.0
+  num_runs: 3
+  concurrency: 1
+
+storage:
+  artifact_policy: external_path
+  result_policy: managed
