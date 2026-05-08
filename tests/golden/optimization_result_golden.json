@@ -1,0 +1,48 @@
+{
+  "name": "golden-optimization-result",
+  "total_runs_analyzed": 12,
+  "styles_found": ["architect", "plain", "repl"],
+  "best_style_overall": "repl",
+  "family_rankings": {
+    "coding": [
+      ["repl", 0.875, 0.075],
+      ["plain", 0.8, 0.0],
+      ["architect", 0.75, 0.05]
+    ]
+  },
+  "best_style_by_family": {
+    "coding": "repl"
+  },
+  "style_variances": {
+    "architect": 0.025,
+    "plain": 0.045,
+    "repl": 0.0625
+  },
+  "insufficient_data": [],
+  "total_style_runs": 12,
+  "all_styles": ["architect", "plain", "repl"],
+  "candidate_results": [
+    {
+      "name": "repl-terse",
+      "task_family": "coding",
+      "baseline": "repl",
+      "instructions": "REPL mode with terse output to reduce tokens while keeping debug effectiveness.",
+      "score": 0.9,
+      "baseline_score": 0.875,
+      "score_delta": 0.025,
+      "run_count": 3,
+      "status": "complete"
+    },
+    {
+      "name": "plain",
+      "task_family": "",
+      "baseline": null,
+      "instructions": "Baseline style",
+      "score": 0.8,
+      "baseline_score": null,
+      "score_delta": null,
+      "run_count": 4,
+      "status": "baseline"
+    }
+  ]
+}

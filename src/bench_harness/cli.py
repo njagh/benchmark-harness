@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -34,6 +35,8 @@ from bench_harness.lm_eval_adapter import (
     get_lm_eval_error,
     TASK_DEFS as LM_EVAL_TASKS,
 )
+from bench_harness.schemas import RunSpec, ModelArtifact
+from bench_harness.storage.config import StorageConfig
 
 app = typer.Typer(
     name="bench-harness",
@@ -121,6 +124,7 @@ def _parse_models_response(resp: dict[str, Any], backend_url: str) -> dict[str, 
 
 @app.command()
 def run(
+    spec: str | None = typer.Argument(None, help="Path to run_spec.yaml or run_spec.json"),
     suite: str = typer.Option("smoke", "--suite", help="Suite name(s), comma-separated"),
     models: str = typer.Option("agent-code", "--models", help="Model alias(es), comma-separated"),
     endpoint: str | None = typer.Option(None, "--endpoint", help="Base URL override"),
@@ -138,8 +142,31 @@ def run(
     prior_runs: str = typer.Option(None, "--prior-runs", help="Path to prior run results JSONL for regression detection"),
 ):
     """Run benchmark suite against one or more models."""
-    suite_names = [s.strip() for s in suite.split(",")]
-    model_aliases = [m.strip() for m in models.split(",")]
+    from bench_harness.schemas import RunSpec, build_run_spec_from_flags
+
+    if spec is not None:
+        spec_path = Path(spec)
+        if not spec_path.exists():
+            console.print(f"[red]Spec file not found: {spec_path}[/red]")
+            sys.exit(1)
+        if spec_path.suffix in (".yaml", ".yml"):
+            run_spec = RunSpec.from_yaml(spec_path)
+        else:
+            run_spec = RunSpec.from_json(spec_path)
+        suite_names = [run_spec.workload.prompt_suite]
+        model_aliases = [run_spec.artifact.model_id or run_spec.artifact.path]
+    else:
+        run_spec = build_run_spec_from_flags(
+            suite=suite,
+            models=[m.strip() for m in models.split(",")],
+            num_runs=runs,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            concurrency=1,
+            context_tokens=context_sizes.split(",")[0].strip(),
+        )
+        suite_names = [s.strip() for s in suite.split(",")]
+        model_aliases = [m.strip() for m in models.split(",")]
 
     if out is None:
         import datetime
@@ -191,6 +218,12 @@ def run(
     # Setup output
     out_path = Path(out)
     out_path.mkdir(parents=True, exist_ok=True)
+
+    # Write resolved spec to result directory
+    config = StorageConfig.from_env(allow_unsafe=True)
+    run_dir = config.create_run_dir(run_spec.name)
+    config.write_resolved_spec(run_spec, run_dir)
+    logger.info("Wrote resolved spec to: %s", run_dir)
 
     # Setup SQLite
     db_path = str(out_path / "benchmark.db")
@@ -889,6 +922,91 @@ def regression_suite(
     console.print(f"[green]Regression suite generated:[/green] {result}")
 
 
+@app.command("init-storage")
+def init_storage(
+    root: str | None = typer.Option(None, "--root", help="Storage root directory"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be created without creating anything"),
+    allow_unsafe: bool = typer.Option(False, "--allow-unsafe-storage-root", help="Allow storage inside git repo or other unsafe locations"),
+):
+    """Initialize storage directories for the benchmark harness."""
+    from bench_harness.storage.config import StorageConfig
+
+    if root is None:
+        config = StorageConfig.from_env(allow_unsafe=allow_unsafe)
+    else:
+        config = StorageConfig.from_cli(Path(root), allow_unsafe=allow_unsafe)
+
+    if dry_run:
+        console.print(f"[cyan]Storage root:[/cyan] {config.root}")
+        console.print()
+        console.print("[dim]Directories that would be created:[/dim]")
+        for ns_name in ("artifacts", "results", "registry", "logs", "cache", "tmp"):
+            ns_path = getattr(config, f"{ns_name}_root")
+            console.print(f"  - {ns_path}")
+        # Also write project config
+        project_config = Path.cwd() / ".llm-bench.yaml"
+        console.print(f"  - {project_config} (project config)")
+        console.print()
+        console.print("[yellow]Dry run — no directories created.[/yellow]")
+        return
+
+    config.ensure_namespaces()
+
+    # Write project config in cwd
+    project_config = Path.cwd() / ".llm-bench.yaml"
+    config_data = {
+        "project": {
+            "default_storage_root": str(config.root),
+        }
+    }
+    project_config.write_text(_yaml_dump(config_data))
+    console.print(f"[green]Storage initialized at:[/green] {config.root}")
+    console.print(f"[green]Project config written to:[/green] {project_config}")
+
+    console.print()
+    console.print("[dim]Namespace paths:[/dim]")
+    for ns_name in ("artifacts", "results", "registry", "logs", "cache", "tmp"):
+        ns_path = getattr(config, f"{ns_name}_root")
+        exists = " [green]✓[/green]" if ns_path.exists() else " [yellow]✗[/yellow]"
+        console.print(f"  {ns_path}{exists}")
+
+
+@app.command("storage-info")
+def storage_info():
+    """Print resolved storage configuration and validity status."""
+    from bench_harness.storage.config import StorageConfig
+
+    try:
+        config = StorageConfig.from_env()
+    except ValueError as e:
+        console.print(f"[red]Storage config error:[/red] {e}")
+        return
+
+    console.print(f"[cyan]Storage root:[/cyan] {config.root}")
+    console.print()
+
+    # Check safety
+    try:
+        from bench_harness.storage.safety import check_storage_root
+        check_storage_root(config.root)
+        console.print("[green]✓ Storage root is valid[/green]")
+    except ValueError as e:
+        console.print(f"[red]✗ {e}[/red]")
+
+    console.print()
+    console.print("[dim]Namespace paths:[/dim]")
+    for ns_name in ("artifacts", "results", "registry", "logs", "cache", "tmp"):
+        ns_path = getattr(config, f"{ns_name}_root")
+        exists = " [green]exists[/green]" if ns_path.exists() else " [yellow]missing[/yellow]"
+        console.print(f"  {ns_path}{exists}")
+
+
+def _yaml_dump(data: dict) -> str:
+    """Safely dump YAML without needing pyyaml as a hard import here."""
+    import yaml  # noqa: F811 — re-import locally
+    return yaml.safe_dump(data, default_flow_style=False)
+
+
 # Register apps
 app.add_typer(export_app, name="export")
 app.add_typer(judge_app, name="judge-config")
@@ -1091,6 +1209,998 @@ def _check_lm_eval_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+# ── Dry-run utility ──────────────────────────────────────────────────
+
+
+def _dry_run(spec: RunSpec, config: StorageConfig) -> None:
+    """Print what a run would do without executing it."""
+    run_dir = config.create_run_dir(spec.name)
+    console.print(f"[bold]dry-run[/bold] Storage root: {config.root}")
+    console.print(f"[bold]dry-run[/bold] Result directory: {run_dir}")
+    console.print(f"[bold]dry-run[/bold] Artifact: {spec.artifact.kind} at {spec.artifact.path}")
+    console.print(f"[bold]dry-run[/bold] Runtime: {spec.runtime.kind} (launch={spec.runtime.launch})")
+    console.print(f"[bold]dry-run[/bold] Workload: {spec.workload.prompt_suite}, {spec.workload.num_runs} runs")
+    console.print(f"[bold]dry-run[/bold] Would write results to: {run_dir}")
+
+
+# ── New storage-aware commands ──────────────────────────────────────
+
+
+@app.command("register-artifact")
+def register_artifact(
+    artifact_yaml: str = typer.Argument(..., help="Path to artifact YAML file"),
+    storage_root: str | None = typer.Option(None, "--storage-root", help="Override storage root"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print what would be registered without writing"),
+    allow_unsafe_storage_root: bool = typer.Option(False, "--allow-unsafe-storage-root", help="Allow storage inside git repo or other unsafe locations"),
+):
+    """Register a model artifact in the benchmark registry."""
+    from bench_harness.registry import ArtifactRegistry, manage_artifact
+    from bench_harness.utils.hashing import compute_artifact_fingerprint, scan_artifact_path
+    from bench_harness.storage.safety import detect_ephemeral_path
+    from bench_harness.schemas.model_artifact import ArtifactMode
+
+    config = StorageConfig.from_env()
+    if storage_root:
+        config = StorageConfig.from_cli(Path(storage_root), allow_unsafe=allow_unsafe_storage_root)
+    else:
+        config = StorageConfig.from_env(allow_unsafe=allow_unsafe_storage_root)
+
+    console = Console()
+    artifact = ModelArtifact.from_yaml(artifact_yaml)
+
+    source_path = Path(artifact.source_path)
+
+    if dry_run:
+        console.print(f"[bold]dry-run[/bold] Would register artifact: {artifact.artifact_id}")
+        console.print(f"[bold]dry-run[/bold] Kind: {artifact.kind}, Mode: {artifact.mode}")
+        console.print(f"[bold]dry-run[/bold] Source: {artifact.source_path}")
+
+        is_ephemeral, warnings = detect_ephemeral_path(artifact.source_path)
+        if is_ephemeral:
+            for w in warnings:
+                console.print(f"  [yellow]Warning:[/yellow] {w}")
+
+        if artifact.mode == ArtifactMode.managed_copy and source_path.exists():
+            scan = scan_artifact_path(source_path)
+            console.print(f"[bold]dry-run[/bold] Would copy to: {config.artifacts_models / artifact.artifact_id}")
+            console.print(f"  Files: {scan['file_count']}, Size: {scan['total_size_bytes']:,} bytes")
+        elif artifact.mode == ArtifactMode.managed_symlink and source_path.exists():
+            console.print(f"[bold]dry-run[/bold] Would symlink to: {config.artifacts_models / artifact.artifact_id}")
+        elif artifact.mode == ArtifactMode.external_path:
+            console.print(f"[bold]dry-run[/bold] External path recorded (no copy)")
+
+        console.print(f"[bold]dry-run[/bold] Registry: {config.registry_root / 'artifacts.jsonl'}")
+        return
+
+    # Handle artifact based on mode
+    effective_path = manage_artifact(artifact, config)
+    console.print(f"[green]Artifact managed:[/green] {effective_path}")
+
+    # Compute fingerprint
+    if source_path.exists():
+        fingerprint = compute_artifact_fingerprint(artifact, source_path)
+        artifact.artifact_fingerprint = fingerprint
+    else:
+        console.print(f"[yellow]Source path {source_path} does not exist, skipping fingerprint[/yellow]")
+
+    # Register in the artifact registry
+    registry = ArtifactRegistry(config)
+    registry.register(artifact)
+
+    # Write artifact manifest to registry location
+    manifest_path = config.registry_root / "artifacts" / f"{artifact.artifact_id}.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_data = artifact.model_dump(mode='python', default=str)
+    with open(manifest_path, 'w') as f:
+        json.dump(manifest_data, f, indent=2, default=str)
+
+    console.print(f"[green]Registered artifact[/green]: {artifact.artifact_id}")
+    console.print(f"Registry: {config.registry_root / 'artifacts.jsonl'}")
+    console.print(f"Manifest: {manifest_path}")
+
+
+@app.command("inspect-artifact")
+def inspect_artifact(
+    path: str = typer.Argument(..., help="Path to model artifact"),
+    dry_run: bool = typer.Option(True, "--dry-run", help="Always implicit for inspect"),
+):
+    """Inspect a model artifact and print its metadata."""
+    import os
+    import hashlib
+    from pathlib import Path
+
+    from bench_harness.storage.safety import detect_ephemeral_path
+
+    console = Console()
+    p = Path(path)
+
+    is_ephemeral, warnings = detect_ephemeral_path(path)
+    if is_ephemeral:
+        for w in warnings:
+            console.print(f"[yellow]Warning:[/yellow] {w}")
+
+    if not p.exists():
+        console.print(f"[red]Error:[/red] Path does not exist: {path}")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Path:[/bold] {p}")
+    console.print(f"[bold]Is directory:[/bold] {p.is_dir()}")
+    console.print(f"[bold]Ephemeral:[/bold] {'yes' if is_ephemeral else 'no'}")
+
+    if p.is_dir():
+        total_size = 0
+        file_count = 0
+        config_files = []
+        for root, dirs, files in os.walk(p):
+            for f in files:
+                fp = Path(root) / f
+                size = fp.stat().st_size
+                total_size += size
+                file_count += 1
+                if f in ('config.json', 'model.safetensors.index.json', 'generation_config.json',
+                         'tokenizer.json', 'tokenizer_config.json', 'config.yaml'):
+                    config_files.append((str(fp.relative_to(p)), size))
+
+        console.print(f"[bold]Total files:[/bold] {file_count}")
+        console.print(f"[bold]Total size:[/bold] {total_size:,} bytes")
+        if config_files:
+            console.print(f"[bold]Config files:[/bold]")
+            for cf, sz in config_files:
+                console.print(f"  - {cf} ({sz:,} bytes)")
+    else:
+        console.print(f"[bold]Size:[/bold] {p.stat().st_size:,} bytes")
+
+
+@app.command("list-runs")
+def list_runs(
+    project: str | None = typer.Option(None, "--project", help="Filter by project name"),
+    storage_root: str | None = typer.Option(None, "--storage-root", help="Override storage root"),
+):
+    """List all benchmark runs in the storage."""
+    config = StorageConfig.from_env()
+    if storage_root:
+        config = StorageConfig.from_cli(Path(storage_root))
+    else:
+        config = StorageConfig.from_env()
+
+    from rich.table import Table
+
+    console = Console()
+    runs_dir = config.results_runs
+
+    if not runs_dir.exists():
+        console.print("[yellow]No runs found.[/yellow]")
+        return
+
+    table = Table(title="Benchmark Runs")
+    table.add_column("Run ID")
+    table.add_column("Name")
+    table.add_column("Project")
+    table.add_column("Date")
+    table.add_column("Runtime")
+
+    run_count = 0
+    for date_dir in sorted(runs_dir.iterdir()):
+        if not date_dir.is_dir():
+            continue
+        for run_dir in sorted(date_dir.iterdir()):
+            if not run_dir.is_dir():
+                continue
+            summary_path = run_dir / "summary.json"
+            result_path = run_dir / "run_result.json"
+            spec_path = run_dir / "resolved_spec.yaml"
+
+            name = run_dir.name
+            run_project = "unknown"
+            runtime = "unknown"
+            date_str = date_dir.name
+
+            if spec_path.exists():
+                import yaml
+                with open(spec_path) as f:
+                    spec_data = yaml.safe_load(f)
+                run_project = spec_data.get("project", "unknown")
+                runtime = spec_data.get("runtime", {}).get("kind", "unknown")
+
+            if project and run_project != project:
+                continue
+
+            table.add_row(name, name.split("__")[0] if "__" in name else name, run_project, date_str, runtime)
+            run_count += 1
+
+    if run_count == 0:
+        console.print("[yellow]No matching runs found.[/yellow]")
+    else:
+        console.print(f"\nTotal: {run_count} run(s)")
+
+
+@app.command("summarize")
+def summarize(
+    project: str = typer.Argument(..., help="Project name to summarize"),
+    storage_root: str | None = typer.Option(None, "--storage-root", help="Override storage root"),
+    fmt: str = typer.Option("json", "--format", help="Output format: json or markdown"),
+):
+    """Summarize benchmark results for a project."""
+    config = StorageConfig.from_env()
+    if storage_root:
+        config = StorageConfig.from_cli(Path(storage_root))
+    else:
+        config = StorageConfig.from_env()
+
+    console = Console()
+    runs_dir = config.results_runs
+
+    summaries = []
+    for date_dir in runs_dir.glob("*/**/summary.json"):
+        if date_dir.exists():
+            with open(date_dir) as f:
+                data = json.load(f)
+            spec_path = date_dir.parent / "resolved_spec.yaml"
+            if spec_path.exists():
+                import yaml
+                with open(spec_path) as f2:
+                    spec_data = yaml.safe_load(f2)
+                if spec_data.get("project") == project:
+                    summaries.append({
+                        "run_dir": str(date_dir.parent),
+                        "summary": data,
+                    })
+
+    if not summaries:
+        console.print(f"[yellow]No results found for project: {project}[/yellow]")
+        return
+
+    if fmt == "markdown":
+        console.print(f"[bold]Project: {project}[/bold]")
+        console.print(f"Total runs: {len(summaries)}\n")
+        for s in summaries:
+            summary = s["summary"]
+            console.print(f"  Run: {s['run_dir'].split('/')[-1]}")
+            console.print(f"    Mean TTFT: {summary.get('mean_ttft_ms', 0):.0f}ms")
+            console.print(f"    Mean decode TPS: {summary.get('mean_decode_tps', 0):.1f}")
+            console.print(f"    Success rate: {summary.get('success_rate', 0):.0%}")
+            console.print()
+    else:
+        output = {"project": project, "runs": summaries}
+        console.print(json.dumps(output, indent=2, default=str))
+
+
+@app.command("export-summary")
+def export_summary(
+    project: str = typer.Argument(..., help="Project name to export"),
+    storage_root: str | None = typer.Option(None, "--storage-root", help="Override storage root"),
+    fmt: str = typer.Option("markdown", "--format", help="Output format: markdown or json"),
+):
+    """Export project summary to a file."""
+    config = StorageConfig.from_env()
+    if storage_root:
+        config = StorageConfig.from_cli(Path(storage_root))
+    else:
+        config = StorageConfig.from_env()
+
+    console = Console()
+
+    runs_dir = config.results_runs
+
+    summaries = []
+    for date_dir in runs_dir.glob("*/**/summary.json"):
+        if date_dir.exists():
+            with open(date_dir) as f:
+                data = json.load(f)
+            spec_path = date_dir.parent / "resolved_spec.yaml"
+            if spec_path.exists():
+                import yaml
+                with open(spec_path) as f2:
+                    spec_data = yaml.safe_load(f2)
+                if spec_data.get("project") == project:
+                    summaries.append({
+                        "run_dir": str(date_dir.parent),
+                        "summary": data,
+                    })
+
+    output_dir = config.results_summaries
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if fmt == "markdown":
+        output_path = output_dir / f"{project}_summary.md"
+        with open(output_path, 'w') as f:
+            f.write(f"# Project: {project}\n\n")
+            f.write(f"Total runs: {len(summaries)}\n\n")
+            for s in summaries:
+                summary = s["summary"]
+                f.write(f"## Run: {s['run_dir'].split('/')[-1]}\n\n")
+                f.write(f"- Mean TTFT: {summary.get('mean_ttft_ms', 0):.0f}ms\n")
+                f.write(f"- Mean decode TPS: {summary.get('mean_decode_tps', 0):.1f}\n")
+                f.write(f"- Success rate: {summary.get('success_rate', 0):.0%}\n\n")
+    else:
+        output_path = output_dir / f"{project}_summary.json"
+        with open(output_path, 'w') as f:
+            json.dump({"project": project, "runs": summaries}, f, indent=2, default=str)
+
+    console.print(f"[green]Exported[/green]: {output_path}")
+
+
+@app.command("compare")
+def compare(
+    run_id_a: str = typer.Argument(..., help="First run ID (partial match on run directory name)"),
+    run_id_b: str = typer.Argument(..., help="Second run ID (partial match on run directory name)"),
+    storage_root: str | None = typer.Option(None, "--storage-root", help="Override storage root"),
+    allow_unsafe: bool = typer.Option(False, "--allow-unsafe-storage-root", help="Allow storage inside git repo or other unsafe locations"),
+):
+    """Compare two benchmark runs by result directory."""
+    from rich.table import Table
+
+    config = StorageConfig.from_env()
+    if storage_root:
+        config = StorageConfig.from_cli(Path(storage_root), allow_unsafe=allow_unsafe)
+    else:
+        config = StorageConfig.from_env(allow_unsafe=allow_unsafe)
+
+    console = Console()
+
+    runs_dir = config.results_runs
+
+    def find_run(run_id: str):
+        for date_dir in runs_dir.glob("*/"):
+            if not date_dir.is_dir():
+                continue
+            for run_dir in date_dir.glob("*/"):
+                if run_id in run_dir.name:
+                    return run_dir
+        return None
+
+    result_a = find_run(run_id_a)
+    result_b = find_run(run_id_b)
+
+    if not result_a or not result_b:
+        console.print(f"[red]Could not find both run directories. Search path: {runs_dir}[/red]")
+        if not result_a:
+            console.print(f"  Missing: '{run_id_a}'")
+        if not result_b:
+            console.print(f"  Missing: '{run_id_b}'")
+        raise typer.Exit(1)
+
+    summary_a_path = result_a / "summary.json"
+    summary_b_path = result_b / "summary.json"
+
+    if not summary_a_path.exists() or not summary_b_path.exists():
+        console.print("[red]Both runs must have a summary.json file[/red]")
+        raise typer.Exit(1)
+
+    with open(summary_a_path) as f:
+        summary_a = json.load(f)
+    with open(summary_b_path) as f:
+        summary_b = json.load(f)
+
+    # Also load specs for metadata
+    spec_a = None
+    spec_b = None
+    spec_a_path = result_a / "resolved_spec.yaml"
+    spec_b_path = result_b / "resolved_spec.yaml"
+    if spec_a_path.exists():
+        import yaml
+        with open(spec_a_path) as f:
+            spec_a = yaml.safe_load(f)
+    if spec_b_path.exists():
+        import yaml
+        with open(spec_b_path) as f:
+            spec_b = yaml.safe_load(f)
+
+    console.print(f"[bold]Comparing:[/bold] {result_a.name} vs {result_b.name}\n")
+
+    if spec_a or spec_b:
+        for label, spec in [("Run A", spec_a), ("Run B", spec_b)]:
+            if spec:
+                console.print(f"[dim]{label}: project={spec.get('project', 'N/A')}, artifact={spec.get('artifact', {}).get('kind', 'N/A')}[/dim]")
+
+    console.print()
+
+    keys = ["mean_ttft_ms", "median_ttft_ms", "p95_ttft_ms",
+            "mean_decode_tps", "median_decode_tps", "p95_decode_tps",
+            "success_rate"]
+    key_labels = {
+        "mean_ttft_ms": "Mean TTFT (ms)",
+        "median_ttft_ms": "Median TTFT (ms)",
+        "p95_ttft_ms": "P95 TTFT (ms)",
+        "mean_decode_tps": "Mean Decode TPS",
+        "median_decode_tps": "Median Decode TPS",
+        "p95_decode_tps": "P95 Decode TPS",
+        "success_rate": "Success Rate",
+    }
+
+    table = Table(title="Metrics Comparison")
+    table.add_column("Metric", style="bold")
+    table.add_column("Run A", justify="right")
+    table.add_column("Run B", justify="right")
+    table.add_column("Delta", justify="right")
+    table.add_column("Flag", justify="center")
+
+    for key in keys:
+        val_a = summary_a.get(key, 0)
+        val_b = summary_b.get(key, 0)
+        delta = val_b - val_a
+
+        if key == "success_rate":
+            fmt_a = f"{val_a:.0%}"
+            fmt_b = f"{val_b:.0%}"
+            delta_str = f"{delta:+.0%}"
+        else:
+            fmt_a = f"{val_a:.2f}"
+            fmt_b = f"{val_b:.2f}"
+            delta_str = f"{delta:+.2f}"
+
+        # Flag: green for improvement, red for regression
+        flag = ""
+        if key == "success_rate":
+            if delta > 0:
+                flag = "[green]▲[/green]"
+            elif delta < 0:
+                flag = "[red]▼[/red]"
+        elif "tps" in key:
+            if delta > 0:
+                flag = "[green]▲[/green]"
+            elif delta < 0:
+                flag = "[red]▼[/red]"
+        elif "ttft" in key:
+            if delta < 0:
+                flag = "[green]▲[/green]"
+            elif delta > 0:
+                flag = "[red]▼[/red]"
+
+        table.add_row(key_labels[key], fmt_a, fmt_b, delta_str, flag)
+
+    console.print(table)
+
+
+@app.command("compare-runs-v2")
+def compare_v2(
+    run_id_a: str = typer.Argument(..., help="First run identifier (partial match on run dir name)"),
+    run_id_b: str = typer.Argument(..., help="Second run identifier (partial match on run dir name)"),
+    storage_root: str | None = typer.Option(None, "--storage-root", help="Override storage root"),
+):
+    """Compare two benchmark runs by result directory."""
+    config = StorageConfig.from_env()
+    if storage_root:
+        config = StorageConfig.from_cli(Path(storage_root))
+    else:
+        config = StorageConfig.from_env()
+
+    console = Console()
+
+    runs_dir = config.results_runs
+
+    def find_run(run_id: str):
+        for date_dir in runs_dir.glob("*/"):
+            for run_dir in date_dir.glob("*/"):
+                if run_id in run_dir.name:
+                    return run_dir
+        return None
+
+    result_a = find_run(run_id_a)
+    result_b = find_run(run_id_b)
+
+    if not result_a or not result_b:
+        console.print("[red]Could not find both run directories.[/red]")
+        raise typer.Exit(1)
+
+    with open(result_a / "summary.json") as f:
+        summary_a = json.load(f)
+    with open(result_b / "summary.json") as f:
+        summary_b = json.load(f)
+
+    console.print(f"[bold]Comparing:[/bold] {result_a.name} vs {result_b.name}\n")
+
+    keys = ["mean_ttft_ms", "median_ttft_ms", "p95_ttft_ms",
+            "mean_decode_tps", "median_decode_tps", "p95_decode_tps",
+            "success_rate"]
+    for key in keys:
+        val_a = summary_a.get(key, 0)
+        val_b = summary_b.get(key, 0)
+        delta = val_b - val_a
+        sign = "+" if delta >= 0 else ""
+        console.print(f"  {key}: {val_a:.2f} -> {val_b:.2f} ({sign}{delta:.2f})")
+
+
+@app.command("bench-run")
+def bench_run(
+    spec: str = typer.Argument(None, help="Path to run_spec.yaml or run_spec.json"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print what would be done without executing"),
+    allow_unsafe: bool = typer.Option(False, "--allow-unsafe-storage-root", help="Allow storage inside git repo or other unsafe locations"),
+):
+    """Run a benchmark using the RunSpec + RuntimeRunner interface (M17-M19)."""
+    from bench_harness.runners import get_runner, RUNNER_REGISTRY
+
+    # Load spec
+    if spec is None:
+        console.print("[red]Spec file is required. Provide a path to run_spec.yaml or run_spec.json[/red]")
+        sys.exit(1)
+
+    spec_path = Path(spec)
+    if not spec_path.exists():
+        console.print(f"[red]Spec file not found: {spec_path}[/red]")
+        sys.exit(1)
+
+    if spec_path.suffix in (".yaml", ".yml"):
+        run_spec = RunSpec.from_yaml(spec_path)
+    else:
+        run_spec = RunSpec.from_json(spec_path)
+
+    console.print(f"[cyan]=== Benchmark Run ===[/cyan]")
+    console.print(f"[dim]Name: {run_spec.name} | Project: {run_spec.project}[/dim]")
+    console.print(f"[dim]Artifact: {run_spec.artifact.kind.value} at {run_spec.artifact.path}[/dim]")
+    console.print(f"[dim]Runtime: {run_spec.runtime.kind.value} (launch={run_spec.runtime.launch.value})[/dim]")
+    console.print(f"[dim]Workload: suite={run_spec.workload.prompt_suite}, runs={run_spec.workload.num_runs}[/dim]")
+
+    # Resolve storage config
+    storage_config = StorageConfig.from_env(allow_unsafe=allow_unsafe)
+
+    if dry_run:
+        _dry_run(run_spec, storage_config)
+        return
+
+    # Create run directory
+    run_dir = storage_config.create_run_dir(run_spec.name)
+    storage_config.write_resolved_spec(run_spec, run_dir)
+    console.print(f"[dim]Run directory: {run_dir}[/dim]")
+
+    # Resolve runner by kind
+    runner_kind = run_spec.runtime.kind.value
+    runner = get_runner(runner_kind, storage_config)
+
+    console.print(f"[dim]Runner: {runner.kind}[/dim]")
+
+    # Prepare
+    prep = runner.prepare(run_spec)
+    console.print("[dim]Preparing runtime...[/dim]")
+
+    # Launch if managed
+    handle = None
+    if run_spec.runtime.launch.value == "managed_process":
+        handle = runner.launch(run_spec, prep)
+        if handle is not None:
+            console.print(f"[dim]Launching process on {handle.host}:{handle.port}...[/dim]")
+            ready = runner.wait_until_ready(run_spec, prep, timeout=120.0)
+            if not ready:
+                console.print("[red]Runtime failed to become ready within timeout[/red]")
+                runner.shutdown(run_spec, prep, handle)
+                sys.exit(1)
+            console.print("[green]Runtime is ready[/green]")
+    else:
+        console.print("[dim]Using external/existing runtime[/dim]")
+
+    try:
+        # Run workload
+        result_dir = run_dir / "results"
+        result_dir.mkdir(parents=True, exist_ok=True)
+
+        console.print("[dim]Running workload...[/dim]")
+        result = runner.run_workload(run_spec, prep, result_dir)
+
+        console.print(f"[green]Workload complete[/green]")
+        console.print(f"  Schema: {result.schema_version}")
+        console.print(f"  Run ID: {result.run_id}")
+        console.print(f"  Requests: {len(result.per_request)}")
+
+        if result.summary:
+            console.print(f"  Success rate: {result.summary.success_rate:.0%}")
+            console.print(f"  Mean TTFT: {result.summary.mean_ttft_ms:.0f}ms")
+            console.print(f"  Mean decode TPS: {result.summary.mean_decode_tps:.1f}")
+
+        # Write results to run directory
+        result.write_to_directory(run_dir)
+        console.print(f"[green]Results written to {run_dir}[/green]")
+
+        # Collect logs
+        logs = runner.collect_logs(run_spec, prep, result_dir)
+        logs_dir = run_dir / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        for filename, content in logs.items():
+            log_path = logs_dir / filename
+            log_path.write_text(content)
+            console.print(f"  [dim]Log: {log_path}[/dim]")
+
+    finally:
+        if handle is not None:
+            runner.shutdown(run_spec, prep, handle)
+            console.print("[dim]Shutdown complete[/dim]")
+
+
+prompt_opt_app = typer.Typer(
+    name="prompt-opt",
+    help="Automatic prompt optimization — analyze styles, propose templates, run candidates",
+    add_completion=False,
+)
+
+
+@prompt_opt_app.command("analyze")
+def prompt_opt_analyze(
+    suite: str = typer.Option("smoke", "--suite", help="Suite ID to analyze"),
+    db: Path = typer.Option(None, "--db", help="Path to benchmark.db"),
+    min_runs: int = typer.Option(1, "--min-runs", help="Minimum runs per style to consider valid"),
+):
+    """Analyze existing benchmark results to rank prompt styles per task family."""
+    from bench_harness.prompt_optimization import PromptOptimizationRunner
+    from rich.table import Table
+
+    if db is None:
+        # Auto-discover: look for benchmark.db in recent run directories
+        runs_dir = Path("runs")
+        candidates = sorted(runs_dir.glob("*/benchmark.db"), reverse=True)
+        if not candidates:
+            console.print("[red]No benchmark.db found. Specify --db or run a benchmark suite first.[/red]")
+            return
+        db = candidates[0]
+
+    runner = PromptOptimizationRunner()
+    analysis = runner.analyze(str(db), suite_id=suite, min_runs_per_style=min_runs)
+
+    console.print(f"[cyan]Prompt Analysis — suite: {suite}[/cyan]")
+    console.print(f"[dim]DB: {db} | Total style runs: {analysis.total_style_runs} | Styles: {', '.join(analysis.all_styles) if analysis.all_styles else 'none'}[/dim]")
+    console.print()
+
+    if not analysis.all_styles:
+        console.print("[yellow]No style-tagged runs found in this suite.[/yellow]")
+        return
+
+    # Best style overall
+    if analysis.best_style_overall:
+        console.print(f"[green]Best style overall:[/green] [bold]{analysis.best_style_overall}[/bold]")
+    console.print()
+
+    # Family rankings
+    if analysis.family_rankings:
+        table = Table(title="Best Style Per Task Family")
+        table.add_column("Family", style="cyan")
+        table.add_column("Best Style", style="green")
+        table.add_column("Avg Score", justify="right")
+        table.add_column("Margin", justify="right")
+        table.add_column("Tasks", justify="right")
+
+        for family, rankings in sorted(analysis.family_rankings.items()):
+            if rankings:
+                best = rankings[0]
+                tasks_run = sum(1 for r in rankings)
+                table.add_row(
+                    family,
+                    best[0],
+                    f"{best[1]:.3f}",
+                    f"{best[2]:+.3f}",
+                    str(tasks_run),
+                )
+        console.print(table)
+
+        # Insufficient data warning
+        if analysis.insufficient_data:
+            console.print()
+            console.print(
+                f"[yellow]⚠ Insufficient data (<{min_runs} runs/style) for: "
+                f"{', '.join(analysis.insufficient_data)}[/yellow]"
+            )
+    else:
+        console.print("[yellow]No family data available (tasks may lack family metadata).[/yellow]")
+
+    # Style variance
+    if analysis.style_variances:
+        console.print()
+        console.print("[dim]Score Variance by Style (higher = more task-dependent):[/dim]")
+        for style, var in sorted(analysis.style_variances.items(), key=lambda x: x[1], reverse=True):
+            bar = "█" * int(var * 20)
+            console.print(f"  {style:20s} {var:.4f} {bar}")
+
+
+@prompt_opt_app.command("propose")
+def prompt_opt_propose(
+    suite: str = typer.Option("smoke", "--suite", help="Suite ID to analyze"),
+    db: Path = typer.Option(None, "--db", help="Path to benchmark.db"),
+    family: str = typer.Option(None, "--family", help="Filter to a specific task family"),
+):
+    """Propose new candidate prompt templates based on failure patterns."""
+    from bench_harness.storage.sqlite import BenchmarkDB
+    from bench_harness.prompt_optimization import generate_proposals
+
+    if db is None:
+        runs_dir = Path("runs")
+        candidates = sorted(runs_dir.glob("*/benchmark.db"), reverse=True)
+        if not candidates:
+            console.print("[red]No benchmark.db found. Specify --db or run a benchmark suite first.[/red]")
+            return
+        db = candidates[0]
+
+    bench_db = BenchmarkDB(str(db))
+    runs = bench_db.get_runs(suite_id=suite)
+
+    if not runs:
+        console.print(f"[yellow]No runs found for suite '{suite}'.[/yellow]")
+        return
+
+    proposals = generate_proposals(runs, task_family=family or "")
+
+    if not proposals:
+        console.print("[cyan]No pattern-based proposals generated.[/cyan]")
+        console.print("[dim]This usually means: (1) insufficient data, (2) no failure patterns matched, or (3) styles are well-balanced.[/dim]")
+        console.print("[dim]Use `bench-harness prompt-opt run` to manually test custom templates.[/dim]")
+        return
+
+    console.print(f"[cyan]Proposed {len(proposals)} candidate template(s):[/cyan]")
+    console.print()
+
+    for i, p in enumerate(proposals, 1):
+        console.print(f"[bold][{i}] {p.name}[/bold] [dim](target: {p.baseline})[/dim]")
+        console.print(f"  [yellow]Why:[/yellow] {p.instructions}")
+        console.print(f"  [dim]Template:[/dim] {p.template_str[:120]}{'...' if len(p.template_str) > 120 else ''}")
+        if p.task_family:
+            console.print(f"  [dim]Family:[/dim] {p.task_family}")
+        console.print()
+
+    # Also list predefined variants that could be tried
+    from bench_harness.prompt_optimization.proposals import _PREDEFINED_VARIANTS
+    console.print("[dim]Other predefined variants available via custom YAML:[/dim]")
+    for variant_name in sorted(_PREDEFINED_VARIANTS.keys()):
+        if not any(p.name == variant_name for p in proposals):
+            info = _PREDEFINED_VARIANTS[variant_name]
+            console.print(f"  - [cyan]{variant_name}[/cyan]: {info['instructions'][:80]}")
+
+
+@prompt_opt_app.command("run-proposed")
+def prompt_opt_run_proposed(
+    spec: Path = typer.Option(..., "--spec", help="Path to proposals YAML spec file"),
+    models: str = typer.Option("agent-code", "--models", help="Model alias(es), comma-separated"),
+    suite: str = typer.Option("smoke", "--suite", help="Suite ID"),
+    db: Path = typer.Option(None, "--db", help="Path to benchmark.db (for task loading)"),
+    out: Path = typer.Option(None, "--out", help="Output directory for results"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be tested without running"),
+):
+    """Run proposed candidate templates against tasks for evaluation."""
+    from bench_harness.prompt_optimization import PromptOptimizationRunner, TemplateRegistry, load_proposals_from_yaml
+    from bench_harness.config import load_model_config, get_model
+    from bench_harness.models.openai_client import OpenAICompatClient
+    from bench_harness.runners.completion_runner import CompletionRunner
+    import asyncio
+
+    # Load proposals from YAML spec
+    proposals = load_proposals_from_yaml(spec)
+    if not proposals:
+        console.print("[yellow]No candidates found in spec file.[/yellow]")
+        return
+
+    model_aliases = [m.strip() for m in models.split(",")]
+    model_config = load_model_config()
+
+    # Resolve endpoint
+    first_alias = model_aliases[0]
+    first_model = get_model(model_config, first_alias)
+    if first_model is None:
+        console.print(f"[red]Model '{first_alias}' not found in config[/red]")
+        return
+    base_url = first_model.get("base_url", "")
+    if not base_url:
+        console.print("[red]No base_url configured[/red]")
+        return
+    model_name = first_model.get("model", first_alias)
+
+    registry = TemplateRegistry()
+    registry.add_baseline("plain")
+    registry.add_candidates(proposals)
+
+    # Determine DB path
+    if db is None:
+        runs_dir = Path("runs")
+        candidates = sorted(runs_dir.glob("*/benchmark.db"), reverse=True)
+        if not candidates:
+            console.print("[red]No benchmark.db found. Specify --db.[/red]")
+            return
+        db = candidates[0]
+
+    if out is None:
+        out = Path(f"runs/prompt-opt-{proposals[0].name}-{suite}-{db.parent.name}")
+
+    if dry_run:
+        console.print(f"[cyan]Dry run — would test {len(proposals)} candidate(s)[/cyan]")
+        console.print(f"  Models: {', '.join(model_aliases)}")
+        console.print(f"  Suite: {suite}")
+        console.print(f"  DB: {db}")
+        console.print()
+        for p in proposals:
+            console.print(f"  [bold]{p.name}[/bold] [dim](baseline: {p.baseline})[/dim]")
+            console.print(f"    [dim]{p.instructions[:80]}...[/dim]")
+        return
+
+    # Setup runner
+    client = OpenAICompatClient(base_url=base_url, model=model_name)
+    runner = CompletionRunner(client)
+
+    opt_runner = PromptOptimizationRunner()
+    opt_runner.base_runner = runner
+
+    console.print(f"[cyan]=== Running Prompt Optimization ===[/cyan]")
+    console.print(f"  Models: {', '.join(model_aliases)}")
+    console.print(f"  Suite: {suite}")
+    console.print(f"  DB: {db}")
+    console.print(f"  Candidates: {len(proposals)}")
+    console.print()
+
+    results = opt_runner.run_candidates(
+        registry=registry,
+        db_path=str(db),
+        model_aliases=model_aliases,
+        suite_id=suite,
+        output_dir=str(out),
+    )
+
+    if not results:
+        console.print("[yellow]No results produced.[/yellow]")
+        return
+
+    # Print results
+    from rich.table import Table
+    table = Table(title="Candidate Results")
+    table.add_column("Candidate", style="cyan")
+    table.add_column("Score", justify="right")
+    table.add_column("Baseline", justify="right")
+    table.add_column("Delta", justify="right")
+    table.add_column("Runs", justify="right")
+    table.add_column("Status", style="dim")
+
+    for r in sorted(results, key=lambda x: x.get("score_delta", -999), reverse=True):
+        delta_str = f"{r['score_delta']:+.3f}" if r.get("score_delta") is not None else "N/A"
+        baseline_str = f"{r.get('baseline_score', 0):.3f}" if r.get('baseline_score') is not None else "-"
+        table.add_row(
+            r["name"],
+            f"{r.get('score', 0):.3f}",
+            baseline_str,
+            delta_str,
+            str(r.get('run_count', 0)),
+            r.get('status', 'unknown'),
+        )
+    console.print(table)
+
+    # Recommendations
+    recommended = [r for r in results if r.get("score_delta", 0) > 0.05]
+    if recommended:
+        console.print()
+        console.print("[green]Recommendations:[/green]")
+        for r in recommended:
+            console.print(
+                f"  - `{r['name']}` scores [green]{r['score_delta']:+.3f}[/green] vs "
+                f"baseline `{r['baseline']}`"
+            )
+    else:
+        console.print()
+        console.print("[yellow]No candidates exceeded the 0.05 improvement threshold.[/yellow]")
+
+    # Generate full report
+    analysis = opt_runner.analyze(str(db), suite_id=suite)
+    report = opt_runner.generate_report(analysis, results)
+    report_path = out / "optimization_report.md"
+    report_path.write_text(report)
+    console.print(f"\n[green]Report saved to:[/green] {report_path}")
+
+    return results
+
+
+@prompt_opt_app.command("run")
+def prompt_opt_run(
+    templates: str = typer.Option(..., "--templates", help="Comma-separated template names/styles to test"),
+    base_styles: str = typer.Option("plain", "--base-styles", help="Comma-separated baseline styles for comparison"),
+    models: str = typer.Option("agent-code", "--models", help="Model alias(es), comma-separated"),
+    suite: str = typer.Option("smoke", "--suite", help="Suite ID"),
+    db: Path = typer.Option(None, "--db", help="Path to benchmark.db"),
+    out: Path = typer.Option(None, "--out", help="Output directory"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be tested without running"),
+):
+    """Run a custom prompt optimization sweep with user-specified templates."""
+    from bench_harness.prompt_optimization import PromptOptimizationRunner, TemplateRegistry
+    from bench_harness.config import load_model_config, get_model
+    from bench_harness.models.openai_client import OpenAICompatClient
+    from bench_harness.runners.completion_runner import CompletionRunner
+
+    template_list = [t.strip() for t in templates.split(",")]
+    baseline_list = [s.strip() for s in base_styles.split(",")]
+    model_aliases = [m.strip() for m in models.split(",")]
+
+    model_config = load_model_config()
+    first_alias = model_aliases[0]
+    first_model = get_model(model_config, first_alias)
+    if first_model is None:
+        console.print(f"[red]Model '{first_alias}' not found in config[/red]")
+        return
+    base_url = first_model.get("base_url", "")
+    if not base_url:
+        console.print("[red]No base_url configured[/red]")
+        return
+    model_name = first_model.get("model", first_alias)
+
+    if db is None:
+        runs_dir = Path("runs")
+        candidates = sorted(runs_dir.glob("*/benchmark.db"), reverse=True)
+        if not candidates:
+            console.print("[red]No benchmark.db found. Specify --db.[/red]")
+            return
+        db = candidates[0]
+
+    if out is None:
+        out = Path(f"runs/prompt-opt-custom-{suite}-{db.parent.name}")
+
+    if dry_run:
+        console.print(f"[cyan]Dry run — custom prompt sweep[/cyan]")
+        console.print(f"  Templates to test: {', '.join(template_list)}")
+        console.print(f"  Baselines: {', '.join(baseline_list)}")
+        console.print(f"  Models: {', '.join(model_aliases)}")
+        console.print(f"  Suite: {suite}")
+        console.print(f"  DB: {db}")
+        return
+
+    client = OpenAICompatClient(base_url=base_url, model=model_name)
+    runner = CompletionRunner(client)
+
+    opt_runner = PromptOptimizationRunner()
+    opt_runner.base_runner = runner
+
+    # Build candidates from template names
+    registry = TemplateRegistry()
+    for style in baseline_list:
+        registry.add_baseline(style)
+    for template in template_list:
+        if template not in baseline_list:
+            from bench_harness.prompt_optimization.proposals import TemplateProposal
+            registry.add_candidate(TemplateProposal(
+                name=template,
+                template_str=f"{{{{ user_message }}}}",  # Will use the style file directly
+                baseline=baseline_list[0],
+                instructions=f"Custom template: {template}",
+            ))
+
+    console.print(f"[cyan]=== Custom Prompt Optimization Sweep ===[/cyan]")
+    console.print(f"  Testing: {', '.join(template_list)}")
+    console.print(f"  Baselines: {', '.join(baseline_list)}")
+    console.print(f"  Models: {', '.join(model_aliases)}")
+    console.print()
+
+    results = opt_runner.run_candidates(
+        registry=registry,
+        db_path=str(db),
+        model_aliases=model_aliases,
+        suite_id=suite,
+        output_dir=str(out),
+    )
+
+    if not results:
+        console.print("[yellow]No results produced.[/yellow]")
+        return
+
+    from rich.table import Table
+    table = Table(title="Custom Sweep Results")
+    table.add_column("Template", style="cyan")
+    table.add_column("Score", justify="right")
+    table.add_column("Runs", justify="right")
+    table.add_column("Status", style="dim")
+
+    for r in sorted(results, key=lambda x: x.get("score", 0), reverse=True):
+        table.add_row(
+            r["name"],
+            f"{r.get('score', 0):.3f}",
+            str(r.get('run_count', 0)),
+            r.get('status', 'unknown'),
+        )
+    console.print(table)
+
+    # Save report
+    analysis = opt_runner.analyze(str(db), suite_id=suite)
+    report = opt_runner.generate_report(analysis, results)
+    report_path = out / "optimization_report.md"
+    report_path.write_text(report)
+    console.print(f"\n[green]Report saved to:[/green] {report_path}")
+
+    return results
+
+
+# Register apps
+app.add_typer(prompt_opt_app, name="prompt-opt")
+
+
+# ── Entry point ──────────────────────────────────────────────────────
 
 
 if __name__ == "__main__":

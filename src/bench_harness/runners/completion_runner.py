@@ -219,6 +219,8 @@ class CompletionRunner:
         speculative_decoding_enabled = params.get("speculative_decoding_enabled")
 
         scorer_version: str | None = None
+        safety_score_val: float | None = None
+        safety_details: dict[str, Any] | None = None
         start_time = datetime.now(timezone.utc)
 
         # Auto-detect code tasks
@@ -337,8 +339,6 @@ class CompletionRunner:
                             )
 
                     # Run command_safety scorer if configured
-                    safety_score_val: float | None = None
-                    safety_details: dict[str, Any] | None = None
                     for sec_name in (secondary_scorer_names or []):
                         if sec_name == "command_safety":
                             try:
@@ -472,6 +472,9 @@ class CompletionRunner:
         backend_url = params.get("backend_url")
         server_start_time = params.get("server_start_time")
         speculative_decoding_enabled = params.get("speculative_decoding_enabled")
+
+        safety_score_val: float | None = None
+        safety_details: dict[str, Any] | None = None
 
         try:
             # Step 1: Call the model to generate code (using system message if present)

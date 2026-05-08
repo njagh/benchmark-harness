@@ -1,0 +1,31 @@
+schema_version: llm_bench.run_spec.v1
+
+name: qwen3-8b-endpoint-smoke
+project: modelopt-3070ti-experiment
+tags:
+  - endpoint
+  - vllm
+
+artifact:
+  kind: openai_endpoint
+  mode: external_path
+  path: http://127.0.0.1:8009/v1
+  model_id: qwen3-8b-int4
+
+runtime:
+  kind: vllm
+  launch: existing
+  host: 127.0.0.1
+  port: 8009
+  model_name: qwen3-8b-int4
+
+workload:
+  prompt_suite: coding_smoke
+  max_tokens: 256
+  temperature: 0.0
+  num_runs: 5
+  concurrency: 1
+
+storage:
+  artifact_policy: external_path
+  result_policy: managed

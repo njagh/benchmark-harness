@@ -40,6 +40,7 @@ long-context = [
 
 [project.scripts]
 bench-harness = "bench_harness.cli:main"
+llm-bench = "llm_bench.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

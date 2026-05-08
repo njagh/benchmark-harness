@@ -482,6 +482,95 @@ def _append_style_analysis(
         lines.append("")
 
 
+def _append_prompt_optimization(
+    lines: list[str],
+    model_stats: dict[str, list[dict[str, Any]]],
+) -> None:
+    """Append Prompt Optimization section if optimization data exists."""
+    # Check for optimization results in the run data
+    all_runs = [r for runs in model_stats.values() for r in runs]
+
+    # Look for optimization suite IDs (contain "-optimization-")
+    opt_runs = [r for r in all_runs if "-optimization-" in (r.get("suite_id", "") or "")]
+
+    if not opt_runs:
+        return
+
+    # Group by suite_id to find optimization runs
+    by_suite: dict[str, list[dict[str, Any]]] = {}
+    for r in opt_runs:
+        sid = r.get("suite_id", "")
+        if sid not in by_suite:
+            by_suite[sid] = []
+        by_suite[sid].append(r)
+
+    for suite_id, suite_runs in sorted(by_suite.items()):
+        # Compute candidate summaries
+        by_style: dict[str, list[dict[str, Any]]] = {}
+        for r in suite_runs:
+            style = r.get("prompt_style", "")
+            if style not in by_style:
+                by_style[style] = []
+            by_style[style].append(r)
+
+        # Find baselines and candidates
+        candidate_names = set()
+        baseline_names: dict[str, float] = {}
+        for style, sruns in by_style.items():
+            scored = [r for r in sruns if r.get("score_primary") is not None]
+            if scored:
+                avg_score = sum(r["score_primary"] for r in scored) / len(scored)
+                if style.endswith("-optimization-"):
+                    continue  # Skip the suite ID itself
+                # Simple heuristic: if the style matches a known candidate pattern
+                # (anything not in the predefined list is a candidate)
+                known_styles = {"plain", "repl", "terse", "patch_only", "architect", "json_schema", "step_by_step"}
+                if style not in known_styles:
+                    candidate_names.add(style)
+                else:
+                    baseline_names[style] = avg_score
+
+        if not candidate_names:
+            continue
+
+        lines.append("## Prompt Optimization")
+        lines.append("")
+        lines.append(f"Suite: `{suite_id}`")
+        lines.append("")
+
+        # Identify baseline (default: plain)
+        plain_score = baseline_names.get("plain", 0)
+
+        lines.append("| Candidate | Avg Score | vs Plain |")
+        lines.append("|---|---|---|")
+        for candidate in sorted(candidate_names):
+            c_runs = by_style.get(candidate, [])
+            scored = [r for r in c_runs if r.get("score_primary") is not None]
+            if scored:
+                c_score = sum(r["score_primary"] for r in scored) / len(scored)
+                delta = c_score - plain_score
+                lines.append(f"| {candidate} | {c_score:.3f} | {delta:+.3f} |")
+
+        lines.append("")
+
+        # Recommendations
+        recommended = []
+        for candidate in candidate_names:
+            c_runs = by_style.get(candidate, [])
+            scored = [r for r in c_runs if r.get("score_primary") is not None]
+            if scored:
+                c_score = sum(r["score_primary"] for r in scored) / len(scored)
+                if c_score - plain_score > 0.05:
+                    recommended.append(candidate)
+
+        if recommended:
+            lines.append(f"**Recommended:** {', '.join(f'`{r}`' for r in recommended)} "
+                         f"score above plain baseline ({plain_score:.3f}).")
+        else:
+            lines.append("**Note:** No candidate exceeded the 0.05 improvement threshold over plain.")
+        lines.append("")
+
+
 def _append_judge_analysis(
     lines: list[str],
     model_stats: dict[str, list[dict[str, Any]]],
@@ -873,6 +962,7 @@ def generate_report_v2(
         "context_analysis",
         "quantization_comparison",
         "style_analysis",
+        "prompt_optimization",
         "judge_analysis",
         "failure_analysis",
         "regression_detection",
@@ -891,6 +981,7 @@ def generate_report_v2(
         "context_analysis": lambda: _append_context_analysis(lines, model_stats),
         "quantization_comparison": lambda: _append_quantization_comparison(lines, model_stats),
         "style_analysis": lambda: _append_style_analysis(lines, model_stats),
+        "prompt_optimization": lambda: _append_prompt_optimization(lines, model_stats),
         "judge_analysis": lambda: _append_judge_analysis(lines, model_stats),
         "failure_analysis": lambda: _append_failure_analysis(lines, model_stats),
         "regression_detection": lambda: _append_regression_detection(

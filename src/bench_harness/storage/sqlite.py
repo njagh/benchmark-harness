@@ -16,6 +16,11 @@ from sqlite_utils import Database
 
 from bench_harness.runners.completion_runner import RunResult
 
+try:
+    from bench_harness.storage.config import StorageConfig
+except ImportError:
+    StorageConfig = None  # type: ignore[misc,assignment]
+
 logger = logging.getLogger(__name__)
 
 
@@ -106,8 +111,17 @@ class SQLiteStore:
         "served_port": "int",
     }
 
-    def __init__(self, db_path: str):
-        self.db_path = Path(db_path)
+    def __init__(
+        self,
+        db_path: str | None = None,
+        config: "StorageConfig | None" = None,
+    ) -> None:
+        if config is not None:
+            self.db_path = config.results_runs / "benchmark.db"
+        elif db_path is not None:
+            self.db_path = Path(db_path)
+        else:
+            self.db_path = Path("runs/benchmark.db")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db = Database(str(self.db_path), memory=False)
 
@@ -1007,3 +1021,4 @@ class SQLiteStore:
             f"%.{family}.%",
         ]
         return list(self.db.query(query, params))
+BenchmarkDB = SQLiteStore

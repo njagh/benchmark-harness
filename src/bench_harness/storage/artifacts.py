@@ -5,25 +5,46 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from bench_harness.runners.completion_runner import RunResult
+
+try:
+    from bench_harness.storage.config import StorageConfig
+except ImportError:
+    StorageConfig = None  # type: ignore[misc,assignment]
 
 logger = logging.getLogger(__name__)
 
 
-def save_run_artifact(result: RunResult, out_dir: str) -> Path:
+def save_run_artifact(
+    result: RunResult,
+    out_dir: str | None = None,
+    config: "StorageConfig | None" = None,
+) -> Path:
     """Write a single run result as a JSONL line to the output directory.
 
     Uses a consolidated runs.jsonl file in append mode.
 
+    If *config* is provided, writes to
+    ``<config.results_root>/runs/<date>/runs.jsonl``.
+    Otherwise falls back to *out_dir*.
+
     Args:
         result: The run result to write.
-        out_dir: Output directory path.
+        out_dir: Output directory path (legacy, used when config is not provided).
+        config: StorageConfig to derive output path from.
 
     Returns:
         Path to the artifact file.
     """
-    output = Path(out_dir)
+    if config is not None:
+        today = __import__('datetime').datetime.now().strftime("%Y-%m-%d")
+        output = config.results_runs / today
+    elif out_dir is not None:
+        output = Path(out_dir)
+    else:
+        output = Path("runs")
     output.mkdir(parents=True, exist_ok=True)
 
     artifact_path = output / "runs.jsonl"
@@ -72,12 +93,13 @@ def save_run_artifact(result: RunResult, out_dir: str) -> Path:
 
 def save_judge_artifact(
     run_id: str,
-    out_dir: str,
-    raw_response: str | None,
-    parsed_scores: dict[str, Any],
-    rubric_name: str,
-    judge_model: str,
-    prompt: str,
+    out_dir: str | None = None,
+    config: "StorageConfig | None" = None,
+    raw_response: str | None = None,
+    parsed_scores: dict[str, Any] | None = None,
+    rubric_name: str = "",
+    judge_model: str = "",
+    prompt: str = "",
 ) -> dict[str, Path]:
     """Save judge-specific artifacts for a run.
 
@@ -88,7 +110,8 @@ def save_judge_artifact(
 
     Args:
         run_id: The run ID this evaluation corresponds to.
-        out_dir: Output directory path.
+        out_dir: Output directory path (legacy, used when config is not provided).
+        config: StorageConfig to derive output path from.
         raw_response: Raw judge model response text.
         parsed_scores: Dict of parsed judge scores.
         rubric_name: Name of the rubric used.
@@ -98,7 +121,13 @@ def save_judge_artifact(
     Returns:
         Dict mapping file type to Path.
     """
-    output = Path(out_dir)
+    if config is not None:
+        today = __import__('datetime').datetime.now().strftime("%Y-%m-%d")
+        output = config.results_runs / today
+    elif out_dir is not None:
+        output = Path(out_dir)
+    else:
+        output = Path("runs")
     output.mkdir(parents=True, exist_ok=True)
 
     paths: dict[str, Path] = {}

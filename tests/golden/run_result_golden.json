@@ -1,0 +1,79 @@
+{
+  "schema_version": "llm_bench.run_result.v1",
+  "run_id": "golden-test-run-001",
+  "run_spec_ref": "test-run-spec.yaml",
+  "project": "test_project",
+  "artifact_fingerprint": {
+    "model_id": "test-model",
+    "kind": "hf_checkpoint",
+    "fingerprint": "sha256:abc123def456"
+  },
+  "per_request": [
+    {
+      "request_id": "req-golden-001",
+      "prompt_id": "prompt-001",
+      "prompt_tokens": 128,
+      "generated_tokens": 256,
+      "ttft_ms": 45.2,
+      "decode_ms": 312.8,
+      "total_wall_ms": 360.0,
+      "tokens_per_second_decode": 818.9,
+      "tokens_per_second_wall": 711.1,
+      "finish_reason": "stop",
+      "error": null,
+      "peak_gpu_memory_mb": 4096.0,
+      "quality_score": 0.85,
+      "quality_explanation": "Good response with correct answer"
+    },
+    {
+      "request_id": "req-golden-002",
+      "prompt_id": "prompt-002",
+      "prompt_tokens": 96,
+      "generated_tokens": 180,
+      "ttft_ms": 38.5,
+      "decode_ms": 245.3,
+      "total_wall_ms": 285.0,
+      "tokens_per_second_decode": 734.0,
+      "tokens_per_second_wall": 631.6,
+      "finish_reason": "stop",
+      "error": null,
+      "peak_gpu_memory_mb": 3800.0,
+      "quality_score": 0.72,
+      "quality_explanation": "Partially correct response"
+    },
+    {
+      "request_id": "req-golden-003",
+      "prompt_id": "prompt-003",
+      "prompt_tokens": 200,
+      "generated_tokens": 400,
+      "ttft_ms": 52.1,
+      "decode_ms": 520.9,
+      "total_wall_ms": 575.0,
+      "tokens_per_second_decode": 768.0,
+      "tokens_per_second_wall": 695.7,
+      "finish_reason": "stop",
+      "error": null,
+      "peak_gpu_memory_mb": 5120.0,
+      "quality_score": 0.91,
+      "quality_explanation": "Excellent response"
+    }
+  ],
+  "summary": {
+    "mean_ttft_ms": 45.27,
+    "median_ttft_ms": 45.2,
+    "p95_ttft_ms": 52.1,
+    "mean_decode_tps": 773.63,
+    "median_decode_tps": 768.0,
+    "p95_decode_tps": 818.9,
+    "mean_wall_tps": 679.47,
+    "median_wall_tps": 695.7,
+    "p95_wall_tps": 711.1,
+    "success_rate": 1.0,
+    "oom_count": 0,
+    "timeout_count": 0,
+    "peak_vram_mb": 5120.0,
+    "average_vram_mb": 4338.67,
+    "qualitative_score": 0.827,
+    "quality_stddev": 0.095
+  }
+}

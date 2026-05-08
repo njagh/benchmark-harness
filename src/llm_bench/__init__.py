@@ -1,3 +1,4 @@
+# Re-export everything public for external users
 from bench_harness.storage.config import StorageConfig
 from bench_harness.storage.safety import check_storage_root, is_unsafe_path
 from bench_harness.schemas import (
