@@ -1,0 +1,39 @@
+schema_version: llm_bench.run_spec.v1
+name: context-stress
+project: benchmark-harness
+tags:
+  - stress-test
+  - context-length
+  - stress
+  - 10K
+  - 25K
+  - 50K
+  - 100K
+  - 250K
+
+artifact:
+  kind: openai_endpoint
+  mode: external_path
+  path: http://127.0.0.1:4000/v1
+  model_id: local-code
+
+runtime:
+  kind: openai_compatible
+  launch: existing
+  host: localhost
+  port: 4000
+  model_name: local-code
+  endpoint: http://127.0.0.1:4000/v1
+  api_key: not-needed
+
+workload:
+  prompt_suite: stress_test_context
+  task_dir: tasks/stress_test_context
+  max_tokens: 128
+  temperature: 0.1
+  num_runs: 3
+  concurrency: 1
+
+storage:
+  artifact_policy: external_path
+  result_policy: managed

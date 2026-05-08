@@ -1,0 +1,35 @@
+schema_version: llm_bench.run_spec.v1
+
+name: local-code-coding-benchmark
+project: benchmark-harness
+tags:
+  - openai-compatible
+  - coding-benchmark
+  - humaneval
+  - mbpp
+  - local-code
+
+artifact:
+  kind: openai_endpoint
+  mode: external_path
+  path: http://127.0.0.1:4000/v1
+  model_id: local-code
+
+runtime:
+  kind: openai_compatible
+  launch: existing
+  host: 127.0.0.1
+  port: 4000
+  model_name: local-code
+
+workload:
+  prompt_suite: coding_benchmark
+  task_dir: tasks/coding_benchmark
+  max_tokens: 512
+  temperature: 0.0
+  num_runs: 3
+  concurrency: 1
+
+storage:
+  artifact_policy: external_path
+  result_policy: managed
