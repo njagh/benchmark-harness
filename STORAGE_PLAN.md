@@ -409,7 +409,7 @@ services:
     image: local/benchmark-harness:latest
     container_name: benchmark-harness
     volumes:
-      - /home/njalbicelli/research/benchmark-harness:/workspace
+      - /path/to/benchmark-harness:/workspace
       - /mnt/datasets-big:/datasets-big
       - /mnt/datasets-big/hf-cache/huggingface:/root/.cache/huggingface
     environment:
@@ -431,7 +431,7 @@ http://host.docker.internal:4000/v1
 or from the host directly:
 
 ```text
-http://spark-e287.local:4000/v1
+http://localhost:4000/v1
 ```
 
 ### Training containers (read-only dataset mounts)

@@ -1,6 +1,6 @@
 project:
   name: modelopt_3070ti
-  default_storage_root: /mnt/datasets-big/llm-bench
+  default_storage_root: /path/to/datasets/llm-bench
   artifact_policy: external_path
   result_policy: managed
   tags: [modelopt, 3070ti, quantization]

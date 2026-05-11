@@ -1,7 +1,7 @@
 models:
   agent-code:
     provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
+    base_url: "http://localhost:4000/v1"
     model: "agent-code"
     backend: vllm
     quantization: FP8
@@ -10,7 +10,7 @@ models:
 
   qwen-dense:
     provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
+    base_url: "http://localhost:4000/v1"
     model: "qwen-dense"
     backend: vllm
     quantization: FP8
@@ -19,7 +19,7 @@ models:
 
   max-brain:
     provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
+    base_url: "http://localhost:4000/v1"
     model: "max-brain"
     backend: vllm
     quantization: GPTQ-Int4

@@ -65,12 +65,12 @@
       "artifact_id": "mixtral-8x7b-q8_0",
       "kind": "gguf",
       "mode": "managed_symlink",
-      "source_path": "/mnt/shared/models/mixtral-8x7b/ggml-model-q8_0.gguf",
+       "source_path": "/path/to/models/mixtral-8x7b/ggml-model-q8_0.gguf",
       "model_id": "mistralai/Mixtral-8x7B-Instruct-v0.1",
       "quantization": "Q8_0",
       "dtype": "float16",
       "parameter_class": "MistralForCausalLM",
-      "tokenizer_path": "/mnt/shared/models/mixtral-8x7b/tokenizer.model",
+       "tokenizer_path": "/path/to/models/mixtral-8x7b/tokenizer.model",
       "file_list_summary": {
         "ggml-model-q8_0.gguf": 30509676288,
         "tokenizer.model": 601399

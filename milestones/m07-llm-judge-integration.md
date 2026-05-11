@@ -37,7 +37,7 @@ Phase D — Data flywheel (Milestone 1 of 4 in phase)
 judge:
   model: "max-brain"            # judge model alias (uses existing model config)
   provider: openai_compatible
-  base_url: "http://spark-e287.local:4000/v1"
+  base_url: "http://localhost:4000/v1"
   temperature: 0                 # deterministic judging
   max_tokens: 2048
   self_consistency_rounds: 1    # number of independent judge calls (1 = no self-consistency)

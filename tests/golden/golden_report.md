@@ -42,7 +42,7 @@ This report compares the performance and quality of three language models across
 
 ### mistral-large-2-2411
 - **Backend:** vLLM (self-hosted)
-- **Endpoint:** http://10.0.1.50:8000/v1
+- **Endpoint:** http://localhost:8000/v1
 - **Total Tasks:** 16
 - **Quality Range:** 0.58 - 0.89
 - **Notes:** Good value, one timeout on long-context task

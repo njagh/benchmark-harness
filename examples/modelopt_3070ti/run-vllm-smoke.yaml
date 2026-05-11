@@ -11,7 +11,7 @@ hardware:
 artifact:
   kind: hf_checkpoint
   mode: external_path
-  path: /mnt/datasets-big/modelopt-runs/qwen-14b-int4-awq
+  path: /path/to/datasets/modelopt-runs/qwen-14b-int4-awq
   model_id: Qwen/Qwen1.5-14B
   quantization: int4_awq
 

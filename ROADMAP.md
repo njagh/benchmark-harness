@@ -193,7 +193,7 @@ Example target interface:
 python -m bench_harness run \
   --suite coding_smoke \
   --models agent-code,qwen-dense,max-brain \
-  --endpoint http://spark-e287.local:4000/v1 \
+  --endpoint http://localhost:4000/v1 \
   --temperature 0 \
   --runs 3 \
   --out runs/2026-05-04-coding-smoke
@@ -393,21 +393,21 @@ Example:
 models:
   agent-code:
     provider: openai_compatible
-    base_url: http://spark-e287.local:4000/v1
+    base_url: http://localhost:4000/v1
     model: agent-code
     backend: vllm
     notes: Qwen3.6-35B-A3B-FP8 via LiteLLM
 
   qwen-dense:
     provider: openai_compatible
-    base_url: http://spark-e287.local:4000/v1
+    base_url: http://localhost:4000/v1
     model: qwen-dense
     backend: vllm
     notes: Qwen3.6-27B-FP8
 
   max-brain:
     provider: openai_compatible
-    base_url: http://spark-e287.local:4000/v1
+    base_url: http://localhost:4000/v1
     model: max-brain
     backend: vllm
     notes: Qwen3.5-122B-A10B GPTQ Int4
@@ -1626,7 +1626,7 @@ and produce a report answering:
 ```text
 Benchmark Report: coding_smoke
 Date: 2026-05-04
-Host: spark-e287
+Host: localhost
 
 Models:
 - agent-code: Qwen3.6-35B-A3B-FP8

@@ -4,7 +4,7 @@ datasets:
     hf_split: "test"
     sample_count: 164
     sample_seed: 1234
-    output_dir: "/mnt/datasets-big/evals/human_eval_v1"
+    output_dir: "/path/to/datasets/evals/human_eval_v1"
     dataset_type: human_eval
 
   mbpp_v1:
@@ -12,5 +12,5 @@ datasets:
     hf_split: "test"
     sample_count: 500
     sample_seed: 1234
-    output_dir: "/mnt/datasets-big/evals/mbpp_v1"
+    output_dir: "/path/to/datasets/evals/mbpp_v1"
     dataset_type: mbpp

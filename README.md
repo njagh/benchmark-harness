@@ -233,7 +233,7 @@ in-place. This is fastest but the source must be durable and accessible.
 artifact:
   kind: hf_checkpoint
   mode: external_path
-  path: /mnt/datasets-big/models/qwen3-8b
+  path: /path/to/datasets/models/qwen3-8b
 ```
 
 ### `managed_copy`
@@ -245,7 +245,7 @@ Copies are incremental — only changed files are re-copied.
 artifact:
   kind: hf_checkpoint
   mode: managed_copy
-  path: /mnt/datasets-big/models/qwen3-8b
+  path: /path/to/datasets/models/qwen3-8b
 ```
 
 ### `managed_symlink`
@@ -257,7 +257,7 @@ duplicated. Useful for large models where copy time is prohibitive.
 artifact:
   kind: hf_checkpoint
   mode: managed_symlink
-  path: /mnt/datasets-big/models/qwen3-8b
+  path: /path/to/datasets/models/qwen3-8b
 ```
 
 ## Project Config
@@ -267,7 +267,7 @@ A `.llm-bench.yaml` file in your project directory sets defaults:
 ```yaml
 project:
   name: my-experiment
-  default_storage_root: /mnt/datasets-big/llm-bench
+  default_storage_root: /path/to/datasets/llm-bench
   artifact_policy: managed_copy
   result_policy: managed
   tags: [experiment, quantization]
@@ -348,7 +348,7 @@ Benchmark a TensorRT-LLM engine:
 artifact:
   kind: trtllm_engine
   mode: managed_copy
-  path: /mnt/datasets-big/engines/qwen3-8b-trtllm
+  path: /path/to/datasets/engines/qwen3-8b-trtllm
 
 runtime:
   kind: trtllm
@@ -371,7 +371,7 @@ Benchmark GGUF models via llama.cpp:
 artifact:
   kind: gguf
   mode: managed_copy
-  path: /mnt/datasets-big/gguf/qwen3-8b-q4_k_m.gguf
+  path: /path/to/datasets/gguf/qwen3-8b-q4_k_m.gguf
 
 runtime:
   kind: llamacpp
@@ -427,7 +427,7 @@ The harness rejects paths that are world-writable or inside /tmp by default.
 Fix: set the storage root to a dedicated directory:
 
 ```bash
-export LLM_BENCH_STORAGE_ROOT=/mnt/datasets-big/llm-bench
+export LLM_BENCH_STORAGE_ROOT=/path/to/datasets/llm-bench
 ```
 
 Or temporarily allow unsafe paths:

@@ -21,13 +21,13 @@ pip install -e /path/to/benchmark-harness
 Point storage to your dataset directory:
 
 ```bash
-bench-harness init-storage --root /mnt/datasets-big/llm-bench
+bench-harness init-storage --root /path/to/datasets/llm-bench
 ```
 
 Or set via environment variable:
 
 ```bash
-export LLM_BENCH_STORAGE_ROOT=/mnt/datasets-big/llm-bench
+export LLM_BENCH_STORAGE_ROOT=/path/to/datasets/llm-bench
 ```
 
 ### 3. Run a benchmark

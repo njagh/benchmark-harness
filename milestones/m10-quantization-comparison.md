@@ -49,7 +49,7 @@ This ensures quantization quality deltas are measured against identical inputs, 
 models:
   qwen35-35b-fp8:
     provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
+    base_url: "http://localhost:4000/v1"
     model: "qwen35-35b-fp8"
     backend: vllm
     quantization:
@@ -66,7 +66,7 @@ models:
 
   qwen35-35b-nvfp4:
     provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
+    base_url: "http://localhost:4000/v1"
     model: "qwen35-35b-nvfp4"
     backend: vllm
     quantization:
@@ -83,7 +83,7 @@ models:
 
   qwen35-35b-gptq-int4:
     provider: openai_compatible
-    base_url: "http://spark-e287.local:4000/v1"
+    base_url: "http://localhost:4000/v1"
     model: "qwen35-35b-gptq-int4"
     backend: vllm
     quantization:
