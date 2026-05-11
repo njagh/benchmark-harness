@@ -189,7 +189,9 @@ class Task(BaseModel):
     @field_validator("context_tokens")
     @classmethod
     def validate_context_tokens(cls, v: str) -> str:
-        allowed = {"small", "medium", "large", "xlarge"}
+        if not v or not v.strip():
+            raise ValueError("context_tokens must be a non-empty string")
+        allowed = ("small", "medium", "large", "xlarge")
         if v not in allowed:
             raise ValueError(f"context_tokens must be one of {allowed}, got {v!r}")
         return v

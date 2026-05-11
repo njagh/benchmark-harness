@@ -1,13 +1,12 @@
-# Benchmark Harness — Local LLM Quality Evaluation
+# Benchmark Harness — Portable LLM Benchmark Library
 
-Evaluates response quality, coding ability, instruction following, and performance
-tradeoffs across locally served models. Produces actionable recommendations for
-choosing the right model and serving configuration for real workflows.
+A library-first toolkit for benchmarking large language models with structured
+configs, safe artifact management, and portable storage.
 
 ## Overview
 
-The benchmark harness is a portable, library-first toolkit for benchmarking
-large language models. It supports:
+The benchmark harness is designed to be installed as a dependency by experiment
+repos (e.g., ModelOpt quantization workflows). It provides:
 
 - **Structured run specs** — YAML-driven configurations with full metadata
 - **Multiple serving backends** — vLLM (managed or existing), TensorRT-LLM,
@@ -15,7 +14,7 @@ large language models. It supports:
 - **Safe artifact management** — managed copy, symlink, or direct external path
 - **Structured results** — JSONL metrics, per-request timing, aggregate summaries
 - **Artifact registry** — JSONL-based tracking across projects and experiments
-- **Project hooks** — plug-in metadata enrichment (e.g., ModelOpt quantization details)
+- **Project hooks** — plug-in metadata enrichment (e.g., ModelOpt quantization)
 
 ## Quick Start
 
@@ -25,9 +24,33 @@ pip install -e .
 
 # Run a benchmark from a spec file
 llm-bench run examples/modelopt_3070ti/run-endpoint-only.yaml
+```
 
-# Or programmatically
-python examples/library-usage.py
+### Programmatic Usage
+
+```python
+from bench_harness import BenchmarkRunner, RunSpec, StorageConfig
+
+# 1. Configure storage
+config = StorageConfig(root="/tmp/bench-storage")
+
+# 2. Load a run spec
+spec = RunSpec.from_yaml("examples/modelopt_3070ti/run-vllm-smoke.yaml")
+
+# 3. Run the benchmark
+runner = BenchmarkRunner(storage=config)
+result = runner.run(spec)
+
+# 4. Inspect results
+print(f"Success rate: {result.summary.success_rate:.0%}")
+print(f"Mean TTFT: {result.summary.mean_ttft_ms:.0f}ms")
+print(f"Mean decode TPS: {result.summary.mean_decode_tps:.1f}")
+```
+
+Or using the legacy `llm_bench` namespace:
+
+```python
+from llm_bench import BenchmarkRunner, RunSpec, StorageConfig
 ```
 
 ## Storage Model
@@ -54,11 +77,14 @@ The storage root contains these namespaces:
 | Cache | `<root>/cache/` | Transient build/cache data |
 | Temp | `<root>/tmp/` | Working temp space |
 
-Each run creates an immutable directory:
+Each run creates an **immutable** directory:
 
 ```
 <results>/runs/2025-01-15/<name>__<timestamp>__<hash>/
 ```
+
+The storage root is **not tied to the repository** — you can run benchmarks
+from any working directory with storage pointing anywhere on the filesystem.
 
 ## CLI Reference
 
@@ -70,36 +96,86 @@ llm-bench run run_spec.yaml [--dry-run]
 llm-bench --help
 llm-bench run --help
 
+# Storage management
+llm-bench init-storage --root /path/to/storage
+llm-bench storage-info
+
+# Result inspection
+llm-bench summarize --project my-project
+llm-bench compare <run_a_dir> <run_b_dir>
+llm-bench export-summary --project my-project --format markdown
+
+# Artifact management
+llm-bench register-artifact artifact.yaml
+llm-bench inspect-artifact <artifact_id>
+
 # Legacy entry point (backward compatible)
 bench-harness --help
 ```
 
 ## Python API
 
+### High-level orchestrator
+
+```python
+from bench_harness import BenchmarkRunner, RunSpec, StorageConfig
+
+config = StorageConfig(root="/mnt/datasets/big")
+runner = BenchmarkRunner(storage=config)
+spec = RunSpec.from_yaml("my-run.yaml")
+result = runner.run(spec)
+```
+
+### Low-level components
+
 ```python
 from bench_harness import (
     StorageConfig,
     RunSpec,
+    RunResult,
+    ModelArtifact,
     ArtifactRegistry,
     ArtifactMetadataHook,
     ModelOptMetadataHook,
+    get_runner,
+    RUNNER_REGISTRY,
 )
 
-# 1. Configure storage
+# Configure storage
 config = StorageConfig.from_env()
 config.ensure_namespaces()
 
-# 2. Load a run spec from YAML
+# Load a run spec from YAML
 spec = RunSpec.from_yaml("my-run.yaml")
 
-# 3. Use the artifact registry
+# Use the artifact registry
 registry = ArtifactRegistry(config)
 registry.register(your_artifact)
 
-# 4. List and query artifacts
-artifacts = registry.list_all()
+# List and query artifacts
+all_artifacts = registry.list_all()
 hf_artifacts = registry.query(kind="hf_checkpoint")
+
+# Get a runner by kind
+runner = get_runner("vllm", config)
 ```
+
+### Available exports
+
+| Export | Description |
+|---|---|
+| `StorageConfig` | Storage root and namespace resolution |
+| `RunSpec` | Run specification schema (from YAML/JSON) |
+| `RunResult` | Benchmark result with summary and per-request data |
+| `ModelArtifact` | Model artifact with kind, mode, and metadata |
+| `ArtifactRegistry` | JSONL-based artifact tracking |
+| `ArtifactMetadataHook` | Base class for metadata enrichment hooks |
+| `ModelOptMetadataHook` | ModelOpt-specific metadata hook |
+| `BenchmarkRunner` | High-level run orchestrator |
+| `RuntimeRunner` | Base class for all runner implementations |
+| `VLLMRunner`, `TRTLLMRunner`, `LlamaCPPRunner` | Backend-specific runners |
+| `RUNNER_REGISTRY` | Map of runner kind strings to classes |
+| `get_runner()` | Factory function to get a runner by kind |
 
 ## Run Spec Reference
 
@@ -108,10 +184,9 @@ Run specs are YAML files with this structure:
 ```yaml
 schema_version: llm_bench.run_spec.v1
 
-run:
-  name: my-run-name          # slug-formatted identifier
-  project: my-project         # project name
-  tags: [optional, tags]     # arbitrary labels
+name: my-run-name          # slug-formatted identifier
+project: my-project         # project name
+tags: [optional, tags]     # arbitrary labels
 
 hardware:                      # optional
   profile: default
@@ -215,10 +290,19 @@ llm-bench run examples/modelopt_3070ti/run-vllm-smoke.yaml
 llm-bench run examples/modelopt_3070ti/run-endpoint-only.yaml
 ```
 
-The included `ModelOptMetadataHook` reads `modelopt_meta.json` from quantized
-models and enriches run results with quantization details.
+The complete workflow:
 
-## vLLM Endpoint Workflow
+1. **Setup** — install harness, configure storage root
+2. **Quantize** — run ModelOpt quantization
+3. **Register artifact** — `llm-bench register-artifact quantization-artifact.yaml`
+4. **Run benchmark** — `llm-bench run run-vllm-smoke.yaml`
+5. **Inspect results** — `llm-bench summarize --project modelopt_3070ti`
+6. **Compare runs** — `llm-bench compare <run_a> <run_b>`
+7. **Export summary** — `llm-bench export-summary --project modelopt_3070ti --format markdown`
+
+## Supported Workflows
+
+### vLLM Endpoint-Only Workflow
 
 Benchmark an already-running vLLM server without launching a new process:
 
@@ -235,19 +319,30 @@ runtime:
   port: 8009
 ```
 
-Start your vLLM server separately:
-
 ```bash
 vllm serve Qwen/Qwen3-8B --host 127.0.0.1 --port 8009
+llm-bench run run-spec.yaml
 ```
 
-Then run the benchmark. The harness will not attempt to manage the server
-process.
+### vLLM Managed Workflow
 
-## TRT-LLM Engine Workflow
+The harness launches, manages, and shuts down vLLM automatically:
 
-Benchmark a TensorRT-LLM engine. The runner is available as a stub with
-clear error messages when invoked:
+```yaml
+runtime:
+  kind: vllm
+  launch: managed_process
+  host: 127.0.0.1
+  port: 8000
+  model_name: qwen-14b-int4
+  args:
+    max_model_len: 4096
+    gpu_memory_utilization: 0.90
+```
+
+### TensorRT-LLM Engine Workflow
+
+Benchmark a TensorRT-LLM engine:
 
 ```yaml
 artifact:
@@ -268,7 +363,7 @@ Run:
 llm-bench run trtllm-run-spec.yaml
 ```
 
-## llama.cpp Comparison Workflow
+### llama.cpp Comparison Workflow
 
 Benchmark GGUF models via llama.cpp:
 
@@ -303,9 +398,8 @@ python -m bench_harness run --suite smoke --models agent-code
 New style:
 ```yaml
 # run-spec.yaml
-run:
-  name: smoke-agent-code
-  project: default
+name: smoke-agent-code
+project: default
 artifact:
   kind: hf_checkpoint
   mode: external_path
@@ -318,21 +412,8 @@ workload:
   max_tokens: 256
   num_runs: 3
 ```
-
 ```bash
 llm-bench run run-spec.yaml
-```
-
-### From old `bench-harness bench-run`
-
-Old:
-```bash
-bench-harness bench-run run_spec.yaml
-```
-
-New (same command, just use `llm-bench`):
-```bash
-llm-bench run run_spec.yaml
 ```
 
 The old `bench-harness` CLI remains available for backward compatibility.
@@ -352,7 +433,7 @@ export LLM_BENCH_STORAGE_ROOT=/mnt/datasets-big/llm-bench
 Or temporarily allow unsafe paths:
 
 ```python
-config = StorageConfig.from_cli(Path("/tmp/my-storage"), allow_unsafe=True)
+config = StorageConfig(root="/tmp/my-storage", allow_unsafe=True)
 ```
 
 ### "Ephemeral artifact path"
@@ -393,38 +474,6 @@ export LLM_BENCH_STORAGE_ROOT=/path/to/storage
 
 Or create a `.llm-bench.yaml` project config in your working directory.
 
-## Context Stress Test
-
-Benchmark context length tolerance by sending progressively larger prefill
-payloads (10K → 25K → 50K → 100K → 250K tokens).
-
-```bash
-# Generate stress test task files
-python -m bench_harness.stress_test_generate
-
-# Run against an existing endpoint
-llm-bench run examples/context-stress.yaml
-```
-
-Generates 5 task files in `tasks/stress_test_context/` with embedded filler
-context at increasing sizes. Runs 3 repetitions each. If the model cannot
-accept a given context size (context error, timeout, etc.), the runner records
-the error gracefully — no crashes.
-
-### How it works
-
-Each stress task contains a huge prompt with ~10K–250K tokens of distractor
-text. The model receives the full prompt, generates a short answer, and the
-runner measures:
-
-- **TTFT** (time to first token) — grows with context size
-- **Decode TPS** (tokens per second during generation)
-- **Context errors** — 400-level rejections when model can't handle the size
-- **Quality** — exact_match scoring against expected output
-
-The `stress_ctx_*.yaml` files are generated by `stress_test_generate.py` and
-can be run with any `openai_compatible` runner against any endpoint.
-
 ## Testing
 
 Run the test suite:
@@ -433,5 +482,5 @@ Run the test suite:
 pytest
 ```
 
-Tests cover storage resolution, schemas, artifact management, and mocked
-benchmark runs.
+1331+ tests covering storage resolution, schemas, artifact management,
+CLI integration, runner lifecycle, and mocked benchmark runs.

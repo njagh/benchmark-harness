@@ -68,13 +68,12 @@ class TestIsUnsafePath:
 
     def test_git_repo_path_is_unsafe(self):
         """Paths inside a git repo are flagged as unsafe."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_root = Path(tmpdir)
-            (repo_root / ".git").mkdir()
-            test_path = repo_root / "storage"
-            is_unsafe, reason = is_unsafe_path(test_path)
-            assert is_unsafe is True
-            assert "git" in reason.lower()
+        # Use explicit git_root to test git detection independently of /tmp filtering
+        git_root = Path("/home")
+        test_path = git_root / "some/user/project/storage"
+        is_unsafe, reason = is_unsafe_path(test_path, git_root=git_root)
+        assert is_unsafe is True
+        assert "git" in reason.lower()
 
     def test_git_root_can_be_passed_explicitly(self):
         """Explicit git_root overrides auto-detection."""

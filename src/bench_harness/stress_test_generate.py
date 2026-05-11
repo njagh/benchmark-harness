@@ -94,12 +94,13 @@ def generate_stress_tasks(
             "The relevant information you need is embedded in the distractor text.\n\n"
             f"## Context ({k_size}K tokens)\n---\n\n"
         )
+        # Embed a unique marker in the middle of the context
+        marker = "###MARKER###"
+        marker_pos = len(total_context_text) // 2
+        context_with_marker = total_context_text[:marker_pos] + "\n\n" + marker + "\n\n" + total_context_text[marker_pos:]
+        
         footer = (
-            f"\n---\n\n**Question:** After reading the entire context above, "
-            "count the total number of English letters (A-Z, a-z, ignoring spaces "
-            "and punctuation) in the first paragraph of the context. "
-            "Return only the count as an integer. "
-            "First paragraph: '{_gen_paragraph()}'"
+            f"\n---\n\n**Question:** Return only the word '###MARKER###'."
         )
 
         prompt = header + total_context_text + footer
@@ -115,7 +116,7 @@ def generate_stress_tasks(
             },
             "expected": {
                 "type": "exact_match",
-                "answer": str(len(_gen_paragraph().replace(" ", "").replace(".", ""))),
+                "answer": marker,
             },
             "context_tokens": f"{k_size}k",
             "estimated_prompt_tokens": estimated_tokens,

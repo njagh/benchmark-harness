@@ -1,21 +1,18 @@
 schema_version: llm_bench.run_spec.v1
 
-name: qwen3-8b-int4-3070ti-smoke
-project: modelopt-3070ti-experiment
-tags:
-  - modelopt
-  - int4
-  - awq
+name: qwen14b-int4-awq-3070ti-smoke
+project: modelopt_3070ti
+tags: [modelopt, int4, awq]
 
 hardware:
   profile: 3070ti-8gb
-  expected_gpu: "RTX 3070 Ti"
+  expected_gpu: RTX 3070 Ti
 
 artifact:
   kind: hf_checkpoint
-  mode: managed_copy
-  path: /mnt/datasets-big/modelopt-runs/qwen3-8b-int4-awq
-  model_id: Qwen/Qwen3-8B
+  mode: external_path
+  path: /mnt/datasets-big/modelopt-runs/qwen-14b-int4-awq
+  model_id: Qwen/Qwen1.5-14B
   quantization: int4_awq
 
 runtime:
@@ -23,7 +20,7 @@ runtime:
   launch: managed_process
   host: 127.0.0.1
   port: 8000
-  model_name: qwen3-8b-int4
+  model_name: qwen-14b-int4
   args:
     max_model_len: 4096
     gpu_memory_utilization: 0.90
@@ -31,10 +28,10 @@ runtime:
 workload:
   prompt_suite: coding_smoke
   max_tokens: 256
-  temperature: 0.0
-  num_runs: 5
+  temperature: 0
+  num_runs: 3
   concurrency: 1
 
 storage:
-  artifact_policy: managed_copy
+  artifact_policy: external_path
   result_policy: managed

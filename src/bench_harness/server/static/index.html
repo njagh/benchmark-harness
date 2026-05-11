@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benchmark Harness</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <div id="app">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>Bench</h1>
+                <span class="version">Harness</span>
+            </div>
+            <ul class="nav-links">
+                <li class="nav-item active" data-page="configs">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    </svg>
+                    Configs
+                </li>
+                <li class="nav-item" data-page="runs">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Runs
+                </li>
+                <li class="nav-item" data-page="results">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                    Results
+                </li>
+                <li class="nav-item" data-page="compare">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    Compare
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div id="storage-status" class="storage-status"></div>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <header class="topbar">
+                <h2 id="page-title">Configs</h2>
+            </header>
+            <div id="page-content"></div>
+        </main>
+    </div>
+
+    <!-- Modal template -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="modal-content" class="modal"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/config_builder.js"></script>
+    <script src="/static/js/runs.js"></script>
+    <script src="/static/js/results.js"></script>
+    <script src="/static/js/compare.js"></script>
+    <script>
+        App.init();
+    </script>
+</body>
+</html>

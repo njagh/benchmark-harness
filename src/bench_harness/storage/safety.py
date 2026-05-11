@@ -38,20 +38,20 @@ def is_unsafe_path(
 
     p = path.resolve()
 
-    # 1. Inside git repo
+    # 1. /tmp or /var/tmp
+    if str(p).startswith("/tmp") or str(p).startswith("/var/tmp"):
+        return True, f"path {p} is inside /tmp or /var/tmp"
+
+    # 2. Inside virtualenv
+    venv_prefix = Path(sys.prefix).resolve()
+    if _is_child_of(p, venv_prefix):
+        return True, f"path {p} is inside the virtualenv at {sys.prefix}"
+
+    # 3. Inside git repo
     if git_root is None:
         git_root = _detect_git_root(p)
     if git_root and _is_child_of(p, git_root):
         return True, f"path {p} is inside the git repo at {git_root}"
-
-    # 2. /tmp or /var/tmp
-    if str(p).startswith("/tmp") or str(p).startswith("/var/tmp"):
-        return True, f"path {p} is inside /tmp or /var/tmp"
-
-    # 3. Inside virtualenv
-    venv_prefix = Path(sys.prefix).resolve()
-    if _is_child_of(p, venv_prefix):
-        return True, f"path {p} is inside the virtualenv at {sys.prefix}"
 
     # 4. Docker overlay
     docker_paths = [

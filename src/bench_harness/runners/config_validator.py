@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import json
 import logging
 import os
@@ -178,7 +179,7 @@ class ConfigValidator:
         Returns:
             Dict with keys: valid, error, method, details.
         """
-        if not shutil_which("systemd-analyze"):
+        if not shutil.which("systemd-analyze"):
             logger.debug("systemd-analyze not available, using format validation")
             result = ConfigValidator.validate_systemd_unit(content)
             return {

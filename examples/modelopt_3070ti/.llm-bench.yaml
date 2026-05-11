@@ -1,12 +1,9 @@
 project:
-  name: modelopt-3070ti-experiment
+  name: modelopt_3070ti
   default_storage_root: /mnt/datasets-big/llm-bench
-  artifact_policy: managed_copy
+  artifact_policy: external_path
   result_policy: managed
-  tags:
-    - modelopt
-    - 3070ti
-    - quantization
+  tags: [modelopt, 3070ti, quantization]
   hooks:
-    - module: bench_harness.hooks
+    - module: modelopt_bench.hooks
       class: ModelOptMetadataHook

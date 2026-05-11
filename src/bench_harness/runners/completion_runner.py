@@ -315,6 +315,7 @@ class CompletionRunner:
                         "scoring": task.get("scoring", {}),
                         "expected": task.get("expected", {}),
                     }
+                    task_dict.update(task)  # enrich with full task fields (family, prompt, etc.)
                     # Run primary scorer
                     if primary_scorer_name:
                         scorer = get_scorer(primary_scorer_name)

@@ -137,6 +137,8 @@ class RunResult(BaseModel):
     run_spec_ref: str
     project: str
     artifact_fingerprint: dict[str, Any] = Field(default_factory=dict)
+    artifact_durable: bool | None = None
+    artifact_warnings: list[str] = Field(default_factory=list)
     per_request: list[RequestResult] = Field(default_factory=list)
     summary: ResultSummary | None = None
 

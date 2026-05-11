@@ -1,7 +1,7 @@
 [project]
 name = "bench-harness"
 version = "0.1.0"
-description = "Local LLM quality benchmark harness"
+description = "Portable, library-grade LLM benchmark harness — storage, schemas, runners, and reports"
 requires-python = ">=3.12"
 dependencies = [
     "typer[all]",
@@ -14,8 +14,6 @@ dependencies = [
     "jsonschema",
     "jinja2",
     "unidiff",
-    "pytest",
-    "pytest-asyncio",
     "tiktoken",
 ]
 
@@ -37,10 +35,15 @@ long-context = [
     "nvidia-ml-py",
     "transformers",
 ]
+web = [
+    "flask",
+    "flask-cors",
+]
 
 [project.scripts]
 bench-harness = "bench_harness.cli:main"
-llm-bench = "llm_bench.cli:main"
+llm-bench = "bench_harness.cli:main"
+bench-harness-web = "bench_harness.server.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

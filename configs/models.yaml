@@ -34,3 +34,12 @@ models:
     quantization: FP8
     tokenizer: cl100k_base
     notes: "Aeon Ultimate XS on direct vLLM port 8016"
+
+  minimax-reap:
+    provider: openai_compatible
+    base_url: "http://localhost:8018/v1"
+    model: "minimax-reap"
+    backend: vllm
+    quantization: Unknown
+    tokenizer: cl100k_base
+    notes: "Minimax ReAP served on localhost port 8018"

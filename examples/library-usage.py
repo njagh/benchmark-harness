@@ -1,92 +1,40 @@
-"""Example: Using llm_bench as a library from another project."""
+"""Example: Using bench_harness as a library from another project.
+
+This script demonstrates the high-level API for running benchmarks
+programmatically, without using the CLI.
+
+To run from outside the repo:
+
+    pip install -e /path/to/benchmark-harness
+    python examples/library-usage.py
+"""
 
 from pathlib import Path
 
-from bench_harness import (
-    StorageConfig,
-    ArtifactRegistry,
-    ArtifactMetadataHook,
-    RunSpec,
-    ArtifactKind,
-    ArtifactMode,
-    RuntimeKind,
-    LaunchMode,
-)
+from bench_harness import BenchmarkRunner, RunSpec, StorageConfig
 
+# 1. Configure storage
+config = StorageConfig(root=Path("/tmp/bench-storage"))
 
-def main() -> None:
-    # 1. Configure storage — resolve from env var or project config
-    config = StorageConfig.from_env()
-    config.ensure_namespaces()
-    print(f"Storage root: {config.root}")
+# 2. Load a run spec (or build one programmatically)
+try:
+    spec = RunSpec.from_yaml("examples/modelopt_3070ti/run-vllm-smoke.yaml")
+except FileNotFoundError:
+    print("Run spec not found — skipping actual benchmark.")
+    print("With a valid spec, this would:")
+    print("  1. Register and resolve the model artifact")
+    print("  2. Launch the selected runner (vLLM, OpenAI, TRT-LLM, llama.cpp)")
+    print("  3. Execute tasks against the model")
+    print("  4. Write results to storage")
+    print()
+    print("Storage config: root=", config.root)
+    exit(0)
 
-    # 2. Use the artifact registry to track models
-    registry = ArtifactRegistry(config)
-    print(f"Registry path: {registry.path}")
+# 3. Run the benchmark
+runner = BenchmarkRunner(storage=config)
+result = runner.run(spec)
 
-    # 3. Create a run spec programmatically
-    spec = RunSpec(
-        name="library-example-run",
-        project="example-project",
-        tags=["example", "library"],
-        artifact={
-            "kind": ArtifactKind.hf_checkpoint,
-            "mode": ArtifactMode.external_path,
-            "path": "/tmp/example-model",
-            "model_id": "example/model",
-        },
-        runtime={
-            "kind": RuntimeKind.openai_compatible,
-            "launch": LaunchMode.existing,
-            "host": "127.0.0.1",
-            "port": 8000,
-        },
-        workload={
-            "prompt_suite": "coding_smoke",
-            "max_tokens": 256,
-            "temperature": 0.0,
-            "num_runs": 3,
-        },
-    )
-
-    print(f"Run spec: {spec.name} | artifact: {spec.artifact.kind}")
-
-    # 4. Register the artifact in the registry
-    from bench_harness.schemas import ModelArtifact
-
-    model_artifact = ModelArtifact(
-        artifact_id="example-001",
-        kind=ArtifactKind.hf_checkpoint,
-        mode=ArtifactMode.managed_copy,
-        source_path="/tmp/example-model",
-        model_id="example/model",
-    )
-    registry.register(model_artifact)
-    print(f"Registered artifact: {model_artifact.artifact_id}")
-
-    # 5. Look up the artifact
-    lookup = registry.lookup("example-001")
-    if lookup:
-        print(f"Looked up artifact: {lookup.artifact_id} at {lookup.source_path}")
-
-    # 6. List all registered artifacts
-    all_artifacts = registry.list_all()
-    print(f"Total artifacts in registry: {len(all_artifacts)}")
-
-    # 7. Filter by kind
-    hf_artifacts = registry.query(kind="hf_checkpoint")
-    print(f"HF checkpoint artifacts: {len(hf_artifacts)}")
-
-    # 8. Load a run spec from YAML
-    example_yaml = Path("examples/modelopt_3070ti/run-endpoint-only.yaml")
-    if example_yaml.exists():
-        loaded_spec = RunSpec.from_yaml(example_yaml)
-        print(f"Loaded spec from YAML: {loaded_spec.name}")
-        print(f"  Artifact kind: {loaded_spec.artifact.kind}")
-        print(f"  Runtime kind: {loaded_spec.runtime.kind}")
-
-    print("\nLibrary usage example complete.")
-
-
-if __name__ == "__main__":
-    main()
+# 4. Inspect results
+print(f"Success rate: {result.summary.success_rate:.0%}")
+print(f"Mean TTFT: {result.summary.mean_ttft_ms:.0f}ms")
+print(f"Mean decode TPS: {result.summary.mean_decode_tps:.1f}")
